@@ -1,0 +1,52 @@
+// ═══════════════════════════════════════════════════════════════
+// ACCENT COLOR INTEGRATION FOR page.tsx
+// ═══════════════════════════════════════════════════════════════
+
+// ADD THIS IMPORT at the top with other imports:
+import { getSetting } from "@/lib/db";
+
+// ADD THIS useEffect inside MineAIChat component (after other useEffects):
+
+// Apply accent color from settings
+useEffect(() => {
+  getSetting("accent_color").then((color) => {
+    if (color) {
+      document.documentElement.style.setProperty("--accent-color", color);
+    }
+  });
+}, []);
+
+// ═══════════════════════════════════════════════════════════════
+// UPDATE globals.css TO USE THE CSS VARIABLE
+// ═══════════════════════════════════════════════════════════════
+
+// Add this to src/app/globals.css at the top after @tailwind directives:
+
+:root {
+  --accent-color: #3b82f6;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// UPDATE SEND BUTTON in ChatInput.tsx to use the accent color
+// ═══════════════════════════════════════════════════════════════
+
+// Replace the Send button's gradient background class:
+// FROM: bg-gradient-to-r from-blue-600 to-indigo-600
+// TO:   style={{ background: "var(--accent-color)" }}
+
+// Full button replacement in ChatInput.tsx:
+<motion.button
+  whileTap={{ scale: 0.95 }}
+  type="submit"
+  disabled={(!value.trim() && !selectedFile) || isTyping}
+  className={cn(
+    "p-2 rounded-xl shrink-0 transition-all duration-200 mb-0.5",
+    (value.trim() || selectedFile) && !isTyping
+      ? "text-zinc-100 hover:opacity-90 shadow-lg shadow-blue-600/20"
+      : "bg-zinc-800 text-zinc-600",
+  )}
+  style={(value.trim() || selectedFile) && !isTyping ? { background: "var(--accent-color)" } : {}}
+  aria-label="Send message"
+>
+  <Send size={15} />
+</motion.button>

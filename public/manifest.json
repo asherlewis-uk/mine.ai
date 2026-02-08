@@ -1,0 +1,24 @@
+{
+  "name": "mine.ai - Privacy-First AI Assistant",
+  "short_name": "mine.ai",
+  "description": "Your personal, local-first AI assistant. All conversations stored on your device.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a0a",
+  "theme_color": "#3b82f6",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
