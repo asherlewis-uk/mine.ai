@@ -8,6 +8,31 @@ import { Avatar } from "./Avatar";
 import { ThinkingBlock } from "./ThinkingBlock";
 import type { Message } from "@/lib/db";
 
+/**
+ * Parse <think> tags from message content.
+ * Returns clean display content and any extracted thinking text.
+ * Acts as a safety net for models that embed reasoning in the content stream.
+ */
+function parseThinkTags(content: string): { displayContent: string; inlineThinking: string } {
+  let inlineThinking = '';
+  let displayContent = content;
+
+  // Extract completed <think>...</think> blocks
+  displayContent = displayContent.replace(/<think>([\s\S]*?)<\/think>/g, (_, t) => {
+    inlineThinking += t;
+    return '';
+  });
+
+  // Handle unclosed <think> (model still streaming thinking)
+  const openIdx = displayContent.indexOf('<think>');
+  if (openIdx !== -1) {
+    inlineThinking += displayContent.slice(openIdx + 7);
+    displayContent = displayContent.slice(0, openIdx);
+  }
+
+  return { displayContent: displayContent.trim(), inlineThinking: inlineThinking.trim() };
+}
+
 interface ChatBubbleProps {
   message: Message;
   bubbleStyle?: "default" | "modern" | "compact";
@@ -34,6 +59,14 @@ function formatTime(date: Date): string {
 
 export function ChatBubble({ message, bubbleStyle = "default", characterAvatar }: ChatBubbleProps) {
   const isAI = message.role === "ai";
+
+  // Parse <think> tags from content as a fallback safety net
+  const { displayContent, inlineThinking } = isAI
+    ? parseThinkTags(message.content)
+    : { displayContent: message.content, inlineThinking: '' };
+
+  // Merge DB-stored thinking with any inline <think> tags found in content
+  const allThinking = [message.thinking, inlineThinking].filter(Boolean).join('\n');
 
   // Define bubble style variants
   const getBubbleClasses = () => {
@@ -92,16 +125,16 @@ export function ChatBubble({ message, bubbleStyle = "default", characterAvatar }
           {isAI ? (
             <div className="prose prose-invert prose-sm max-w-none prose-p:my-1 prose-pre:my-2 prose-pre:bg-zinc-950 prose-pre:border prose-pre:border-zinc-800 prose-code:text-blue-300 prose-code:bg-zinc-800/50 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:before:content-[''] prose-code:after:content-[''] prose-headings:mt-3 prose-headings:mb-2">
               <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>
-                {message.content}
+                {displayContent}
               </ReactMarkdown>
             </div>
           ) : (
-            <div className="whitespace-pre-wrap">{message.content}</div>
+            <div className="whitespace-pre-wrap">{displayContent}</div>
           )}
         </div>
-        {isAI && message.thinking && (
+        {isAI && allThinking && (
           <div className="w-full">
-            <ThinkingBlock content={message.thinking} />
+            <ThinkingBlock content={allThinking} />
           </div>
         )}
         <span className="text-[10px] text-zinc-500 mt-1 px-1">

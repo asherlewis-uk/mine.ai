@@ -72,6 +72,7 @@ export const DEFAULT_SETTINGS = {
   modelName: "llama2",
   systemPrompt: "You are a helpful AI assistant named mine.ai. Be concise, clear, and friendly.",
   temperature: 0.7,
+  top_p: 1.0,
   thinkingEnabled: true,
   haptic_enabled: true,
   spelling_enabled: true,

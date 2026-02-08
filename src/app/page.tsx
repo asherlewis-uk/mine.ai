@@ -184,9 +184,19 @@ export default function MineAIChat() {
     // Build the system prompt strictly from character data or use safe default
     let systemPrompt: string;
     
-    // If chatting with a character, use their definition exclusively
+    // If chatting with a character, build an authoritative character prompt
     if (currentCharacter) {
-      systemPrompt = `You are ${currentCharacter.name}. ${currentCharacter.description}. Your traits are: ${currentCharacter.definition}`;
+      const parts: string[] = [];
+      parts.push(`You are ${currentCharacter.name}.`);
+      if (currentCharacter.subtitle) parts.push(currentCharacter.subtitle + '.');
+      if (currentCharacter.description) parts.push(currentCharacter.description);
+      // Definition is the PRIMARY behavioral instruction set for this character
+      if (currentCharacter.definition && currentCharacter.definition.trim()) {
+        parts.push('\n\n' + currentCharacter.definition.trim());
+      }
+      // Enforcement: prevent the model from breaking character
+      parts.push(`\n\nIMPORTANT: Stay in character at all times as ${currentCharacter.name}. Never break character, never say you are an AI or a language model. Always respond from the perspective and personality described above.`);
+      systemPrompt = parts.join(' ');
     } else {
       // Use user's custom system prompt from settings, or safe default
       systemPrompt = settings.systemPrompt || "You are mine.ai, a private, local-first AI assistant.";
@@ -211,8 +221,26 @@ export default function MineAIChat() {
       apiMessages[apiMessages.length - 1].content = userMessage;
     }
 
-    let accumulatedContent = "";
+    let accumulatedRawContent = "";
     let accumulatedThinking = "";
+
+    // Helper: parse <think> tags from streamed content
+    const separateThinkTags = (raw: string): { content: string; thinking: string } => {
+      let thinking = '';
+      let content = raw;
+      // Extract completed <think>...</think> blocks
+      content = content.replace(/<think>([\s\S]*?)<\/think>/g, (_, t) => {
+        thinking += t;
+        return '';
+      });
+      // Handle unclosed <think> (still streaming thinking)
+      const openIdx = content.indexOf('<think>');
+      if (openIdx !== -1) {
+        thinking += content.slice(openIdx + 7);
+        content = content.slice(0, openIdx);
+      }
+      return { content: content.trim(), thinking: thinking.trim() };
+    };
 
     // Create abort controller for this stream
     const abortController = new AbortController();
@@ -225,12 +253,18 @@ export default function MineAIChat() {
         modelName: settings.modelName,
         systemPrompt, // Now uses the correct system prompt!
         temperature: settings.temperature,
+        topP: settings.top_p,
         contextLength: settings.context_length,
         messages: apiMessages,
         signal: abortController.signal,
         onChunk: (chunk) => {
-          accumulatedContent += chunk;
-          updateMessage(aiMessageId, { content: accumulatedContent }).catch((err) => {
+          accumulatedRawContent += chunk;
+          const parsed = separateThinkTags(accumulatedRawContent);
+          const mergedThinking = [accumulatedThinking, parsed.thinking].filter(Boolean).join('\n');
+          updateMessage(aiMessageId, {
+            content: parsed.content,
+            ...(mergedThinking ? { thinking: mergedThinking } : {}),
+          }).catch((err) => {
             console.error("Failed to update message:", err);
           });
         },
@@ -300,6 +334,7 @@ export default function MineAIChat() {
   const handleNewThread = useCallback(async () => {
     const newThread = await createThread();
     setActiveThreadId(newThread.id);
+    setInputValue(""); // Clear input for fresh state
     setSidebarOpen(false);
   }, []);
 

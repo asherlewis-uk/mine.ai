@@ -57,6 +57,7 @@ export interface StreamOptions {
   modelName: string;
   systemPrompt: string;
   temperature: number;
+  topP?: number;
   contextLength?: number;
   messages: Array<{ role: "user" | "assistant" | "system"; content: string }>;
   onChunk: (chunk: string) => void;
@@ -76,6 +77,7 @@ export async function streamAIResponse(options: StreamOptions): Promise<void> {
     modelName,
     systemPrompt,
     temperature,
+    topP,
     contextLength,
     messages,
     onChunk,
@@ -101,6 +103,7 @@ export async function streamAIResponse(options: StreamOptions): Promise<void> {
           ...messages,
         ],
         temperature,
+        ...(topP !== undefined ? { top_p: topP } : {}),
         stream: true,
         ...(contextLength ? { num_ctx: contextLength } : {}),
       }),

@@ -251,6 +251,7 @@ function AISettingsScreen({ onBack }: { onBack: () => void }) {
   const [localApiUrl, setLocalApiUrl] = useState("");
   const [localModelName, setLocalModelName] = useState("");
   const [localTemperature, setLocalTemperature] = useState(0.7);
+  const [localTopP, setLocalTopP] = useState(1.0);
   const [localContextLength, setLocalContextLength] = useState(4096);
   const [localThinking, setLocalThinking] = useState(true);
   const [availableModels, setAvailableModels] = useState<string[]>([]);
@@ -262,6 +263,7 @@ function AISettingsScreen({ onBack }: { onBack: () => void }) {
       setLocalApiUrl(settings.apiUrl);
       setLocalModelName(settings.modelName);
       setLocalTemperature(settings.temperature);
+      setLocalTopP(settings.top_p);
       setLocalContextLength(settings.context_length);
       setLocalThinking(settings.thinkingEnabled);
     }
@@ -275,6 +277,15 @@ function AISettingsScreen({ onBack }: { onBack: () => void }) {
     }, 300);
     return () => clearTimeout(timer);
   }, [localTemperature]);
+
+  // Auto-save top_p on change (debounced)
+  useEffect(() => {
+    if (!settings) return;
+    const timer = setTimeout(() => {
+      setSetting("top_p", localTopP);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [localTopP]);
 
   // Auto-save context length on change (debounced)
   useEffect(() => {
@@ -337,6 +348,7 @@ function AISettingsScreen({ onBack }: { onBack: () => void }) {
     await setSetting("apiUrl", localApiUrl);
     await setSetting("modelName", localModelName);
     await setSetting("temperature", localTemperature);
+    await setSetting("top_p", localTopP);
     await setSetting("context_length", localContextLength);
     await setSetting("thinkingEnabled", localThinking);
     onBack();
@@ -421,7 +433,7 @@ function AISettingsScreen({ onBack }: { onBack: () => void }) {
           </div>
         </Section>
 
-        <Section title="Temperature" footer={`Current: ${localTemperature}`}>
+        <Section title="Temperature" footer={`Current: ${localTemperature}. Higher = more creative, lower = more focused.`}>
           <div className="px-4 py-3">
             <input
               type="range"
@@ -430,6 +442,20 @@ function AISettingsScreen({ onBack }: { onBack: () => void }) {
               step="0.1"
               value={localTemperature}
               onChange={(e) => setLocalTemperature(parseFloat(e.target.value))}
+              className="w-full"
+            />
+          </div>
+        </Section>
+
+        <Section title="Top P (Nucleus Sampling)" footer={`Current: ${localTopP}. Controls diversity via cumulative probability cutoff.`}>
+          <div className="px-4 py-3">
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.05"
+              value={localTopP}
+              onChange={(e) => setLocalTopP(parseFloat(e.target.value))}
               className="w-full"
             />
           </div>
