@@ -44,11 +44,31 @@ export function ThemeManager() {
 
     // 1. APPLY DARK/LIGHT MODE
     const mode = theme?.value || "dark"; // Default to dark
-    if (mode === "dark") {
+    
+    let effectiveMode = mode;
+    if (mode === "system") {
+      // Check system preference
+      effectiveMode = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    }
+    
+    if (effectiveMode === "dark") {
       root.classList.add("dark");
     } else {
       root.classList.remove("dark");
     }
+
+    // Listen for system theme changes when in "system" mode
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    const handleSystemThemeChange = (e: MediaQueryListEvent) => {
+      if ((theme?.value || "dark") === "system") {
+        if (e.matches) {
+          root.classList.add("dark");
+        } else {
+          root.classList.remove("dark");
+        }
+      }
+    };
+    mediaQuery.addEventListener("change", handleSystemThemeChange);
 
     // 2. APPLY ACCENT COLOR
     const colorHex = (accent?.value as string) || "#3b82f6"; // Default Blue
@@ -63,6 +83,9 @@ export function ThemeManager() {
       root.style.setProperty("--ring", hsl);
     }
 
+    return () => {
+      mediaQuery.removeEventListener("change", handleSystemThemeChange);
+    };
   }, [theme, accent]);
 
   return null; // This component is invisible

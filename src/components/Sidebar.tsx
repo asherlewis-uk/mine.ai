@@ -1,8 +1,8 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useLiveQuery } from "dexie-react-hooks";
-import { X, Sparkles, Plus, Settings, User, Trash2, MessageSquare, Users } from "lucide-react";
+import { X, Sparkles, Plus, Settings, User, Trash2, Pencil, MessageSquare, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { db, createThread, deleteThread, type Character } from "@/lib/db";
+import { db, createThread, deleteThread, updateThreadTitle, type Character } from "@/lib/db";
 import { ThreadItem } from "./ThreadItem";
 import { CharacterSidebarTab } from "./Character/CharacterSidebarTab";
 import { useState } from "react";
@@ -55,6 +55,14 @@ export function Sidebar({
           onSelectThread(newThread.id);
         }
       }
+    }
+  };
+
+  const handleRenameThread = async (threadId: string, currentTitle: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const newTitle = prompt("Rename conversation:", currentTitle);
+    if (newTitle && newTitle.trim() && newTitle.trim() !== currentTitle) {
+      await updateThreadTitle(threadId, newTitle.trim());
     }
   };
 
@@ -176,6 +184,15 @@ export function Sidebar({
                         onClose();
                       }}
                     />
+                    <motion.button
+                      whileTap={{ scale: 0.9 }}
+                      type="button"
+                      onClick={(e) => handleRenameThread(thread.id, thread.title, e)}
+                      className="absolute right-10 top-1/2 -translate-y-1/2 p-1.5 rounded-lg bg-zinc-900/90 border border-zinc-800 text-zinc-500 hover:text-blue-400 hover:border-blue-500/50 opacity-0 group-hover:opacity-100 transition-all"
+                      aria-label="Rename thread"
+                    >
+                      <Pencil size={13} />
+                    </motion.button>
                     <motion.button
                       whileTap={{ scale: 0.9 }}
                       type="button"

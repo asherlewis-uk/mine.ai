@@ -36,6 +36,7 @@ export default function MineAIChat() {
   const [activeCharacter, setActiveCharacter] = useState<Character | null>(null);
   const [modelStatus, setModelStatus] = useState<"online" | "offline" | "unknown">("unknown");
   const scrollRef = useRef<HTMLDivElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Initialize database on mount
   useEffect(() => {
@@ -115,26 +116,6 @@ export default function MineAIChat() {
 
   // Get bubble style from settings
   const bubbleStyle = useLiveQuery(() => getSetting("bubble_style")) || "default";
-
-  // Auto-scroll to bottom when messages change
-  const messages = useLiveQuery(
-    async () => {
-      if (!activeThreadId) return [];
-      return db.messages
-        .where("threadId")
-        .equals(activeThreadId)
-        .sortBy("timestamp");
-    },
-    [activeThreadId]
-  );
-
-  useEffect(() => {
-    if (messages && messages.length > 0) {
-      setTimeout(() => {
-        scrollRef.current?.scrollIntoView({ behavior: "smooth" });
-      }, 100);
-    }
-  }, [messages?.length]);
 
   const handleSend = useCallback(async (message: string, file?: File) => {
     const trimmed = message.trim();
@@ -233,6 +214,10 @@ export default function MineAIChat() {
     let accumulatedContent = "";
     let accumulatedThinking = "";
 
+    // Create abort controller for this stream
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
     try {
       setModelStatus("online");
       await streamAIResponse({
@@ -240,7 +225,9 @@ export default function MineAIChat() {
         modelName: settings.modelName,
         systemPrompt, // Now uses the correct system prompt!
         temperature: settings.temperature,
+        contextLength: settings.context_length,
         messages: apiMessages,
+        signal: abortController.signal,
         onChunk: (chunk) => {
           accumulatedContent += chunk;
           updateMessage(aiMessageId, { content: accumulatedContent }).catch((err) => {
@@ -257,8 +244,15 @@ export default function MineAIChat() {
         },
         onComplete: () => {
           setIsTyping(false);
+          abortControllerRef.current = null;
         },
         onError: (error) => {
+          // Don't show error if user manually aborted
+          if (error.name === "AbortError") {
+            setIsTyping(false);
+            abortControllerRef.current = null;
+            return;
+          }
           console.error("Streaming error:", error);
           setModelStatus("offline");
           updateMessage(aiMessageId, {
@@ -294,6 +288,14 @@ export default function MineAIChat() {
       "Conversation cleared. How can I help you?"
     );
   }, [activeThreadId]);
+
+  const handleStop = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+      setIsTyping(false);
+    }
+  }, []);
 
   const handleNewThread = useCallback(async () => {
     const newThread = await createThread();
@@ -393,6 +395,7 @@ export default function MineAIChat() {
           onChange={setInputValue}
           onSubmit={(message, file) => handleSend(message, file)}
           isTyping={isTyping}
+          onStop={handleStop}
         />
       </main>
     </div>

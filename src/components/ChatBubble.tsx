@@ -1,6 +1,8 @@
 import { motion } from "framer-motion";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import rehypeHighlight from "rehype-highlight";
+import "highlight.js/styles/github-dark.css";
 import { cn } from "@/lib/utils";
 import { Avatar } from "./Avatar";
 import { ThinkingBlock } from "./ThinkingBlock";
@@ -89,7 +91,7 @@ export function ChatBubble({ message, bubbleStyle = "default", characterAvatar }
         <div className={getBubbleClasses()}>
           {isAI ? (
             <div className="prose prose-invert prose-sm max-w-none prose-p:my-1 prose-pre:my-2 prose-pre:bg-zinc-950 prose-pre:border prose-pre:border-zinc-800 prose-code:text-blue-300 prose-code:bg-zinc-800/50 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:before:content-[''] prose-code:after:content-[''] prose-headings:mt-3 prose-headings:mb-2">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>
                 {message.content}
               </ReactMarkdown>
             </div>

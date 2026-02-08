@@ -251,6 +251,7 @@ function AISettingsScreen({ onBack }: { onBack: () => void }) {
   const [localApiUrl, setLocalApiUrl] = useState("");
   const [localModelName, setLocalModelName] = useState("");
   const [localTemperature, setLocalTemperature] = useState(0.7);
+  const [localContextLength, setLocalContextLength] = useState(4096);
   const [localThinking, setLocalThinking] = useState(true);
   const [availableModels, setAvailableModels] = useState<string[]>([]);
   const [isFetchingModels, setIsFetchingModels] = useState(false);
@@ -261,9 +262,28 @@ function AISettingsScreen({ onBack }: { onBack: () => void }) {
       setLocalApiUrl(settings.apiUrl);
       setLocalModelName(settings.modelName);
       setLocalTemperature(settings.temperature);
+      setLocalContextLength(settings.context_length);
       setLocalThinking(settings.thinkingEnabled);
     }
   }, [settings]);
+
+  // Auto-save temperature on change (debounced)
+  useEffect(() => {
+    if (!settings) return;
+    const timer = setTimeout(() => {
+      setSetting("temperature", localTemperature);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [localTemperature]);
+
+  // Auto-save context length on change (debounced)
+  useEffect(() => {
+    if (!settings) return;
+    const timer = setTimeout(() => {
+      setSetting("context_length", localContextLength);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [localContextLength]);
 
   // Fetch models when API URL changes
   useEffect(() => {
@@ -317,6 +337,7 @@ function AISettingsScreen({ onBack }: { onBack: () => void }) {
     await setSetting("apiUrl", localApiUrl);
     await setSetting("modelName", localModelName);
     await setSetting("temperature", localTemperature);
+    await setSetting("context_length", localContextLength);
     await setSetting("thinkingEnabled", localThinking);
     onBack();
   };
@@ -411,6 +432,24 @@ function AISettingsScreen({ onBack }: { onBack: () => void }) {
               onChange={(e) => setLocalTemperature(parseFloat(e.target.value))}
               className="w-full"
             />
+          </div>
+        </Section>
+
+        <Section title="Context Window" footer={`Tokens sent to model: ${localContextLength.toLocaleString()}. Higher values use more memory.`}>
+          <div className="px-4 py-3">
+            <select
+              value={localContextLength}
+              onChange={(e) => setLocalContextLength(parseInt(e.target.value))}
+              className="w-full rounded-xl bg-zinc-800 px-4 py-3 text-[15px] text-zinc-200 outline-none border border-zinc-700"
+            >
+              <option value={2048}>2,048 tokens</option>
+              <option value={4096}>4,096 tokens</option>
+              <option value={8192}>8,192 tokens</option>
+              <option value={16384}>16,384 tokens</option>
+              <option value={32768}>32,768 tokens</option>
+              <option value={65536}>65,536 tokens</option>
+              <option value={131072}>131,072 tokens</option>
+            </select>
           </div>
         </Section>
 
@@ -791,6 +830,13 @@ function AppearanceScreen({ onBack }: { onBack: () => void }) {
 
   const handleAppearanceChange = async (value: string) => {
     await setSetting("appearance", value);
+    // Sync with theme_mode key that ThemeManager watches
+    const modeMap: Record<string, "dark" | "light" | "system"> = {
+      Dark: "dark",
+      Light: "light",
+      System: "system",
+    };
+    await setSetting("theme_mode", modeMap[value] || "dark");
   };
 
   const handleTextSizeChange = async (size: "small" | "medium" | "large") => {

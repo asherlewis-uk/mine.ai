@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, type FormEvent, type KeyboardEvent } from "react";
 import { motion } from "framer-motion";
-import { Send, Paperclip, Mic, X } from "lucide-react";
+import { Send, Paperclip, Mic, X, Square } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface ChatInputProps {
@@ -8,6 +8,7 @@ interface ChatInputProps {
   onChange: (value: string) => void;
   onSubmit: (message: string, file?: File) => void;
   isTyping: boolean;
+  onStop?: () => void;
 }
 
 // Extend Window interface for webkit speech recognition
@@ -44,7 +45,7 @@ interface SpeechRecognitionInstance {
   stop: () => void;
 }
 
-export function ChatInput({ value, onChange, onSubmit, isTyping }: ChatInputProps) {
+export function ChatInput({ value, onChange, onSubmit, isTyping, onStop }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
@@ -228,21 +229,35 @@ export function ChatInput({ value, onChange, onSubmit, isTyping }: ChatInputProp
         >
           <Mic size={17} />
         </motion.button>
-        <motion.button
-          whileTap={{ scale: 0.95 }}
-          type="submit"
-          disabled={(!value.trim() && !selectedFile) || isTyping}
-          className={cn(
-            "p-2 rounded-xl shrink-0 transition-all duration-200 mb-0.5",
-            (value.trim() || selectedFile) && !isTyping
-              ? "text-zinc-100 hover:opacity-90 shadow-lg shadow-blue-600/20"
-              : "bg-zinc-800 text-zinc-600",
-          )}
-          style={(value.trim() || selectedFile) && !isTyping ? { background: "var(--accent-color)" } : {}}
-          aria-label="Send message"
-        >
-          <Send size={15} />
-        </motion.button>
+        {isTyping && onStop ? (
+          <motion.button
+            whileTap={{ scale: 0.95 }}
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            type="button"
+            onClick={onStop}
+            className="p-2 rounded-xl shrink-0 bg-red-600 text-zinc-100 hover:bg-red-500 transition-all duration-200 mb-0.5 shadow-lg shadow-red-600/20"
+            aria-label="Stop generation"
+          >
+            <Square size={13} fill="currentColor" />
+          </motion.button>
+        ) : (
+          <motion.button
+            whileTap={{ scale: 0.95 }}
+            type="submit"
+            disabled={(!value.trim() && !selectedFile) || isTyping}
+            className={cn(
+              "p-2 rounded-xl shrink-0 transition-all duration-200 mb-0.5",
+              (value.trim() || selectedFile) && !isTyping
+                ? "text-zinc-100 hover:opacity-90 shadow-lg shadow-blue-600/20"
+                : "bg-zinc-800 text-zinc-600",
+            )}
+            style={(value.trim() || selectedFile) && !isTyping ? { background: "var(--accent-color)" } : {}}
+            aria-label="Send message"
+          >
+            <Send size={15} />
+          </motion.button>
+        )}
       </form>
       <p className="text-center text-[10px] text-zinc-600 mt-2.5 tracking-tight">
         {"mine.ai can make mistakes. Verify important information."}

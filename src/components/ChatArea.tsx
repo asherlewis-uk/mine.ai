@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, useEffect, useLayoutEffect } from "react";
 import { AnimatePresence } from "framer-motion";
 import { useLiveQuery } from "dexie-react-hooks";
 import { ChatBubble } from "./ChatBubble";
@@ -17,6 +17,7 @@ interface ChatAreaProps {
 
 export function ChatArea({ threadId, isTyping, bubbleStyle = "default", characterAvatar, onSuggestionClick }: ChatAreaProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const messages = useLiveQuery(
     async () => {
@@ -28,6 +29,25 @@ export function ChatArea({ threadId, isTyping, bubbleStyle = "default", characte
     },
     [threadId]
   );
+
+  // Auto-scroll to bottom when messages change (including streaming content updates)
+  // useLiveQuery re-fires on every Dexie update, so this catches streaming tokens too
+  useLayoutEffect(() => {
+    if (!messages || messages.length === 0) return;
+    // Small delay to let the DOM update with new content
+    requestAnimationFrame(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    });
+  }, [messages]);
+
+  // Also scroll when typing indicator appears
+  useEffect(() => {
+    if (isTyping) {
+      requestAnimationFrame(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      });
+    }
+  }, [isTyping]);
 
   // Scroll to bottom when messages change
   const shouldShowWelcome = !messages || messages.length === 0;

@@ -57,11 +57,13 @@ export interface StreamOptions {
   modelName: string;
   systemPrompt: string;
   temperature: number;
+  contextLength?: number;
   messages: Array<{ role: "user" | "assistant" | "system"; content: string }>;
   onChunk: (chunk: string) => void;
   onThinking?: (thinking: string) => void;
   onComplete: () => void;
   onError: (error: Error) => void;
+  signal?: AbortSignal;
 }
 
 /**
@@ -74,11 +76,13 @@ export async function streamAIResponse(options: StreamOptions): Promise<void> {
     modelName,
     systemPrompt,
     temperature,
+    contextLength,
     messages,
     onChunk,
     onThinking,
     onComplete,
     onError,
+    signal,
   } = options;
 
   try {
@@ -98,7 +102,9 @@ export async function streamAIResponse(options: StreamOptions): Promise<void> {
         ],
         temperature,
         stream: true,
+        ...(contextLength ? { num_ctx: contextLength } : {}),
       }),
+      signal,
     });
 
     if (!response.ok) {
