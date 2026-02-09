@@ -123,6 +123,11 @@ export function ChatBubble({ message, bubbleStyle = "default", characterAvatar }
           isAI ? "items-start" : "items-end",
         )}
       >
+        {isAI && showThinking && allThinking && (
+          <div className="w-full">
+            <ThinkingBlock content={allThinking} />
+          </div>
+        )}
         <div className={getBubbleClasses()}>
           {isAI ? (
             <div className="prose prose-invert prose-sm max-w-none prose-p:my-1 prose-pre:my-2 prose-pre:bg-zinc-950 prose-pre:border prose-pre:border-zinc-800 prose-code:text-blue-300 prose-code:bg-zinc-800/50 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:before:content-[''] prose-code:after:content-[''] prose-headings:mt-3 prose-headings:mb-2">
@@ -134,11 +139,6 @@ export function ChatBubble({ message, bubbleStyle = "default", characterAvatar }
             <div className="whitespace-pre-wrap">{displayContent}</div>
           )}
         </div>
-        {isAI && showThinking && allThinking && (
-          <div className="w-full">
-            <ThinkingBlock content={allThinking} />
-          </div>
-        )}
         <span className="text-[10px] text-zinc-500 mt-1 px-1">
           {formatTime(message.timestamp)}
         </span>
