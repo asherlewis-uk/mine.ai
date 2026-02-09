@@ -104,7 +104,20 @@ export function CharacterProfileSheet({
                 {/* Description */}
                 {character.description && (
                   <div className="px-6 py-4 border-t border-zinc-800">
+                    <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-2">Bio</h3>
                     <p className="text-sm text-zinc-300">{character.description}</p>
+                  </div>
+                )}
+
+                {/* System Prompt / Definition (Read-only) */}
+                {character.definition && (
+                  <div className="px-6 py-4 border-t border-zinc-800">
+                    <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-2">System Prompt</h3>
+                    <div className="max-h-[200px] overflow-y-auto">
+                      <pre className="text-xs text-zinc-400 whitespace-pre-wrap font-mono bg-zinc-800/50 rounded-lg p-3 border border-zinc-700/50">
+                        {character.definition}
+                      </pre>
+                    </div>
                   </div>
                 )}
 

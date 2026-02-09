@@ -6,7 +6,8 @@ import "highlight.js/styles/github-dark.css";
 import { cn } from "@/lib/utils";
 import { Avatar } from "./Avatar";
 import { ThinkingBlock } from "./ThinkingBlock";
-import type { Message } from "@/lib/db";
+import { useLiveQuery } from "dexie-react-hooks";
+import { getSetting, type Message } from "@/lib/db";
 
 /**
  * Parse <think> tags from message content.
@@ -59,8 +60,9 @@ function formatTime(date: Date): string {
 
 export function ChatBubble({ message, bubbleStyle = "default", characterAvatar }: ChatBubbleProps) {
   const isAI = message.role === "ai";
+  const showThinking = useLiveQuery(() => getSetting('thinkingEnabled'), [], true);
 
-  // Parse <think> tags from content as a fallback safety net
+  // Parse <think> tags from content — always strip them from display
   const { displayContent, inlineThinking } = isAI
     ? parseThinkTags(message.content)
     : { displayContent: message.content, inlineThinking: '' };
@@ -132,7 +134,7 @@ export function ChatBubble({ message, bubbleStyle = "default", characterAvatar }
             <div className="whitespace-pre-wrap">{displayContent}</div>
           )}
         </div>
-        {isAI && allThinking && (
+        {isAI && showThinking && allThinking && (
           <div className="w-full">
             <ThinkingBlock content={allThinking} />
           </div>

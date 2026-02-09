@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
-import { Menu, Sparkles, Sliders, Trash2 } from "lucide-react";
+import { Menu, Sparkles, Sliders, Trash2, User } from "lucide-react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { getSetting, setSetting, getAllSettings } from "@/lib/db";
+import { getSetting, setSetting, getAllSettings, type Character } from "@/lib/db";
 import { fetchModels } from "@/lib/api";
 import { useState, useEffect } from "react";
 
@@ -10,6 +10,8 @@ interface ChatHeaderProps {
   onSettingsClick: () => void;
   onClearChat?: () => void;
   modelStatus?: "online" | "offline" | "unknown";
+  activeCharacter?: Character | null;
+  onAvatarClick?: () => void;
 }
 
 export function ChatHeader({
@@ -17,6 +19,8 @@ export function ChatHeader({
   onSettingsClick,
   onClearChat,
   modelStatus = "unknown",
+  activeCharacter,
+  onAvatarClick,
 }: ChatHeaderProps) {
   const modelName = useLiveQuery(() => getSetting('modelName'));
   const [availableModels, setAvailableModels] = useState<string[]>([]);
@@ -53,9 +57,30 @@ export function ChatHeader({
           <Menu size={20} />
         </motion.button>
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-600/20">
-            <Sparkles size={14} className="text-zinc-100" />
-          </div>
+          <motion.button
+            whileTap={{ scale: 0.95 }}
+            type="button"
+            onClick={activeCharacter ? onAvatarClick : undefined}
+            className={`w-8 h-8 rounded-full flex items-center justify-center shadow-lg overflow-hidden ${
+              activeCharacter ? "cursor-pointer ring-2 ring-blue-500/50 hover:ring-blue-400" : ""
+            }`}
+          >
+            {activeCharacter?.avatar ? (
+              <img
+                src={activeCharacter.avatar}
+                alt={activeCharacter.name}
+                className="w-8 h-8 rounded-full object-cover"
+              />
+            ) : activeCharacter ? (
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center">
+                <User size={14} className="text-zinc-100" />
+              </div>
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shadow-blue-600/20">
+                <Sparkles size={14} className="text-zinc-100" />
+              </div>
+            )}
+          </motion.button>
           <div>
             {availableModels.length > 0 ? (
               <select
@@ -71,7 +96,7 @@ export function ChatHeader({
               </select>
             ) : (
               <h1 className="text-[14px] font-semibold text-zinc-100 leading-tight tracking-tight truncate max-w-[200px]">
-                {modelName || 'mine.ai'}
+                {activeCharacter?.name || modelName || 'mine.ai'}
               </h1>
             )}
             <div className="flex items-center gap-1.5">

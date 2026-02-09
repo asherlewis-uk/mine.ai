@@ -412,6 +412,8 @@ export default function MineAIChat() {
           onSettingsClick={() => setSettingsOpen(true)}
           onClearChat={handleClearChat}
           modelStatus={modelStatus}
+          activeCharacter={activeCharacter}
+          onAvatarClick={() => setCharacterProfileOpen(true)}
         />
 
         {/* Scrollable Messages */}
