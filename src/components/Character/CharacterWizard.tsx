@@ -100,7 +100,7 @@ export function CharacterWizard({ isOpen, onClose, onSave, existingCharacter }: 
       case "photo":
         return true; // Optional
       case "greetings":
-        return greetings.length > 0 || !useAiGreeting;
+        return useAiGreeting || greetings.length > 0;
       case "details":
         return subtitle.trim().length > 0 && description.trim().length > 0;
       default:
@@ -258,21 +258,47 @@ export function CharacterWizard({ isOpen, onClose, onSave, existingCharacter }: 
                         Add greeting messages that your character will use to start conversations.
                       </p>
 
+                      {/* AI Greeting Toggle */}
+                      <div className="flex items-center justify-between p-3 bg-zinc-800 rounded-lg border border-zinc-700">
+                        <div className="flex items-center gap-2">
+                          <Sparkles className="w-4 h-4 text-blue-500" />
+                          <span className="text-sm text-zinc-300">Use AI Greeting for New Chats</span>
+                        </div>
+                        <button
+                          onClick={() => setUseAiGreeting(!useAiGreeting)}
+                          className={`relative w-12 h-6 rounded-full transition-colors ${
+                            useAiGreeting ? "bg-blue-600" : "bg-zinc-700"
+                          }`}
+                        >
+                          <motion.div
+                            animate={{ x: useAiGreeting ? 24 : 2 }}
+                            className="absolute top-1 w-4 h-4 bg-white rounded-full"
+                          />
+                        </button>
+                      </div>
+
+                      {useAiGreeting && (
+                        <p className="text-xs text-blue-400 px-1">
+                          The AI will automatically generate a greeting when starting new chats with this character.
+                        </p>
+                      )}
+
                       {/* Greeting Input */}
-                      <div className="space-y-2">
+                      <div className={`space-y-2 transition-opacity ${useAiGreeting ? "opacity-40 pointer-events-none" : ""}`}>
                         <textarea
                           value={currentGreeting}
                           onChange={(e) => setCurrentGreeting(e.target.value.slice(0, 4096))}
                           placeholder="Type a greeting message..."
                           className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
                           rows={3}
+                          disabled={useAiGreeting}
                         />
                         <div className="flex items-center justify-between">
                           <span className="text-xs text-zinc-500">{currentGreeting.length}/4096</span>
                           <div className="flex gap-2">
                             <button
                               onClick={handleAddGreeting}
-                              disabled={!currentGreeting.trim()}
+                              disabled={!currentGreeting.trim() || useAiGreeting}
                               className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-zinc-700 disabled:text-zinc-500 text-white rounded-lg transition-colors text-sm"
                             >
                               Add Greeting
@@ -304,24 +330,6 @@ export function CharacterWizard({ isOpen, onClose, onSave, existingCharacter }: 
                         </div>
                       )}
 
-                      {/* AI Greeting Toggle */}
-                      <div className="flex items-center justify-between p-3 bg-zinc-800 rounded-lg border border-zinc-700">
-                        <div className="flex items-center gap-2">
-                          <Sparkles className="w-4 h-4 text-blue-500" />
-                          <span className="text-sm text-zinc-300">Use AI Greeting for New Chats</span>
-                        </div>
-                        <button
-                          onClick={() => setUseAiGreeting(!useAiGreeting)}
-                          className={`relative w-12 h-6 rounded-full transition-colors ${
-                            useAiGreeting ? "bg-blue-600" : "bg-zinc-700"
-                          }`}
-                        >
-                          <motion.div
-                            animate={{ x: useAiGreeting ? 24 : 2 }}
-                            className="absolute top-1 w-4 h-4 bg-white rounded-full"
-                          />
-                        </button>
-                      </div>
                     </motion.div>
                   )}
 
