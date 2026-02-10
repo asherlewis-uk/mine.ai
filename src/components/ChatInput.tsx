@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, type FormEvent, type KeyboardEvent } from 
 import { motion } from "framer-motion";
 import { Send, Paperclip, Mic, X, Square } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { AlertDialog } from "./ConfirmDialog";
 
 interface ChatInputProps {
   value: string;
@@ -9,6 +10,7 @@ interface ChatInputProps {
   onSubmit: (message: string, file?: File) => void;
   isTyping: boolean;
   onStop?: () => void;
+  onKeyboardOffset?: (offset: number) => void;
 }
 
 // Extend Window interface for webkit speech recognition
@@ -50,7 +52,7 @@ interface SpeechRecognitionInstance {
   stop: () => void;
 }
 
-export function ChatInput({ value, onChange, onSubmit, isTyping, onStop }: ChatInputProps) {
+export function ChatInput({ value, onChange, onSubmit, isTyping, onStop, onKeyboardOffset }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
@@ -59,6 +61,7 @@ export function ChatInput({ value, onChange, onSubmit, isTyping, onStop }: ChatI
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isListening, setIsListening] = useState(false);
   const [keyboardOffset, setKeyboardOffset] = useState(0);
+  const [speechAlert, setSpeechAlert] = useState(false);
   
   const MAX_ROWS = 4;
   const LINE_HEIGHT = 20;
@@ -74,10 +77,12 @@ export function ChatInput({ value, onChange, onSubmit, isTyping, onStop }: ChatI
         
         const showHandle = Keyboard.addListener("keyboardWillShow", (info: { keyboardHeight: number }) => {
           setKeyboardOffset(info.keyboardHeight);
+          onKeyboardOffset?.(info.keyboardHeight);
         });
         
         const hideHandle = Keyboard.addListener("keyboardWillHide", () => {
           setKeyboardOffset(0);
+          onKeyboardOffset?.(0);
         });
 
         cleanupFns.push(
@@ -91,7 +96,9 @@ export function ChatInput({ value, onChange, onSubmit, isTyping, onStop }: ChatI
         if (vv) {
           const handleResize = () => {
             const offset = window.innerHeight - vv.height;
-            setKeyboardOffset(offset > 50 ? offset : 0);
+            const kbOffset = offset > 50 ? offset : 0;
+            setKeyboardOffset(kbOffset);
+            onKeyboardOffset?.(kbOffset);
           };
           vv.addEventListener("resize", handleResize);
           cleanupFns.push(() => vv.removeEventListener("resize", handleResize));
@@ -183,7 +190,7 @@ export function ChatInput({ value, onChange, onSubmit, isTyping, onStop }: ChatI
 
   const toggleListening = () => {
     if (!recognitionRef.current) {
-      alert("Speech recognition is not supported in this browser.");
+      setSpeechAlert(true);
       return;
     }
 
@@ -317,6 +324,13 @@ export function ChatInput({ value, onChange, onSubmit, isTyping, onStop }: ChatI
       <p className="text-center text-[10px] text-zinc-600 mt-2.5 tracking-tight">
         {"mine.ai can make mistakes. Verify important information."}
       </p>
+
+      <AlertDialog
+        isOpen={speechAlert}
+        title="Speech Recognition"
+        message="Speech recognition is not supported in this browser."
+        onClose={() => setSpeechAlert(false)}
+      />
     </div>
   );
 }

@@ -90,7 +90,7 @@ export const DEFAULT_SETTINGS = {
   font_size_modifier: "medium" as "small" | "medium" | "large",
   notifications_enabled: true,
   bubble_style: "default" as "default" | "modern" | "compact",
-  theme_mode: "dark" as "dark" | "light" | "system",
+  theme_mode: "system" as "dark" | "light" | "system",
   context_length: 4096,
   auto_lock_timeout: 5,
   user_email: "",
@@ -198,10 +198,12 @@ export async function addMessage(
   await touchThread(threadId);
   
   // Auto-generate thread title from first user message
-  const messages = await db.messages.where("threadId").equals(threadId).toArray();
-  if (messages.length === 1 && role === "user") {
-    const title = content.slice(0, 50) + (content.length > 50 ? "..." : "");
-    await updateThreadTitle(threadId, title);
+  if (role === "user") {
+    const userMessages = await db.messages.where("threadId").equals(threadId).filter(m => m.role === "user").toArray();
+    if (userMessages.length === 1) {
+      const title = content.slice(0, 50) + (content.length > 50 ? "..." : "");
+      await updateThreadTitle(threadId, title);
+    }
   }
   
   return message;
@@ -291,6 +293,17 @@ export async function createCharacterThread(
   };
   await db.threads.add(thread);
   return thread;
+}
+
+// ─── Atomic Theme Settings ───────────────────────────────────────
+export async function setThemeSettings(
+  appearance: string,
+  themeMode: "dark" | "light" | "system"
+): Promise<void> {
+  await db.transaction("rw", db.settings, async () => {
+    await db.settings.put({ key: "appearance", value: appearance });
+    await db.settings.put({ key: "theme_mode", value: themeMode });
+  });
 }
 
 // ─── Initialization ──────────────────────────────────────────────

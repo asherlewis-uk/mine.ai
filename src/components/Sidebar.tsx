@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { db, createThread, deleteThread, updateThreadTitle, toggleArchiveThread, type Character } from "@/lib/db";
 import { ThreadItem } from "./ThreadItem";
 import { CharacterSidebarTab } from "./Character/CharacterSidebarTab";
+import { ConfirmDialog, PromptDialog } from "./ConfirmDialog";
 import { useState, useCallback } from "react";
 
 interface SidebarProps {
@@ -32,6 +33,8 @@ export function Sidebar({
 }: SidebarProps) {
   const [activeTab, setActiveTab] = useState<SidebarTab>("chats");
   const [openSwipeId, setOpenSwipeId] = useState<string | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ threadId: string } | null>(null);
+  const [renamePrompt, setRenamePrompt] = useState<{ threadId: string; currentTitle: string } | null>(null);
 
   const handleSwipeOpen = useCallback((threadId: string) => {
     setOpenSwipeId(threadId);
@@ -58,16 +61,21 @@ export function Sidebar({
 
   const handleDeleteThread = async (threadId: string, e?: React.MouseEvent) => {
     e?.stopPropagation();
-    if (confirm("Delete this conversation?")) {
-      await deleteThread(threadId);
-      if (activeThreadId === threadId) {
-        const remaining = await db.threads.orderBy("updatedAt").reverse().first();
-        if (remaining) {
-          onSelectThread(remaining.id);
-        } else {
-          const newThread = await createThread();
-          onSelectThread(newThread.id);
-        }
+    setDeleteConfirm({ threadId });
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteConfirm) return;
+    const threadId = deleteConfirm.threadId;
+    setDeleteConfirm(null);
+    await deleteThread(threadId);
+    if (activeThreadId === threadId) {
+      const remaining = await db.threads.orderBy("updatedAt").reverse().first();
+      if (remaining) {
+        onSelectThread(remaining.id);
+      } else {
+        const newThread = await createThread();
+        onSelectThread(newThread.id);
       }
     }
   };
@@ -90,8 +98,14 @@ export function Sidebar({
 
   const handleRenameThread = async (threadId: string, currentTitle: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    const newTitle = prompt("Rename conversation:", currentTitle);
-    if (newTitle && newTitle.trim() && newTitle.trim() !== currentTitle) {
+    setRenamePrompt({ threadId, currentTitle });
+  };
+
+  const handleConfirmRename = async (newTitle: string) => {
+    if (!renamePrompt) return;
+    const { threadId, currentTitle } = renamePrompt;
+    setRenamePrompt(null);
+    if (newTitle.trim() && newTitle.trim() !== currentTitle) {
       await updateThreadTitle(threadId, newTitle.trim());
     }
   };
@@ -133,10 +147,10 @@ export function Sidebar({
         {/* Sidebar Header */}
         <div className="flex items-center justify-between p-4 border-b border-zinc-800/50">
           <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center">
+            <div className="w-7 h-7 rounded-lg bg-linear-to-br from-blue-600 to-indigo-600 flex items-center justify-center">
               <Sparkles size={14} className="text-zinc-100" />
             </div>
-            <span className="text-[15px] font-semibold text-zinc-100 tracking-tight">
+            <span className="text-[15px] font-semibold text-zinc-900 dark:text-zinc-100 tracking-tight">
               mine.ai
             </span>
           </div>
@@ -157,7 +171,7 @@ export function Sidebar({
             whileTap={{ scale: 0.95 }}
             type="button"
             onClick={handleNewChat}
-            className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-zinc-100 text-[13px] font-medium hover:opacity-90 transition-opacity shadow-lg shadow-blue-600/15"
+            className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-linear-to-r from-blue-600 to-indigo-600 text-white text-[13px] font-medium hover:opacity-90 transition-opacity shadow-lg shadow-blue-600/15"
           >
             <Plus size={15} />
             New Chat
@@ -166,14 +180,14 @@ export function Sidebar({
 
         {/* Tab Selector */}
         <div className="px-3 py-2 border-b border-zinc-800/50">
-          <div className="flex gap-1 bg-zinc-900/50 rounded-lg p-1">
+          <div className="flex gap-1 bg-zinc-200/80 dark:bg-zinc-900/50 rounded-lg p-1">
             <button
               onClick={() => setActiveTab("chats")}
               className={cn(
                 "flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-xs font-medium transition-colors",
                 activeTab === "chats"
-                  ? "bg-zinc-800 text-white"
-                  : "text-zinc-400 hover:text-white"
+                  ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-sm"
+                  : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
               )}
             >
               <MessageSquare size={14} />
@@ -184,8 +198,8 @@ export function Sidebar({
               className={cn(
                 "flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-xs font-medium transition-colors",
                 activeTab === "characters"
-                  ? "bg-zinc-800 text-white"
-                  : "text-zinc-400 hover:text-white"
+                  ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-sm"
+                  : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
               )}
             >
               <Users size={14} />
@@ -198,9 +212,9 @@ export function Sidebar({
         {/* Tap anywhere in the list background to close any open swipe row */}
         {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
         <div className="flex-1 overflow-hidden" onPointerDown={(e) => {
-          // Only reset on taps that land directly on the scroll area background,
-          // not on child thread rows (those handle their own events).
-          if (openSwipeId && e.target === e.currentTarget) {
+          // Reset open swipe row when tapping anywhere in the scroll area,
+          // including padding/gap between children (not just the exact container).
+          if (openSwipeId) {
             handleCloseAllSwipes();
           }
         }}>
@@ -250,11 +264,11 @@ export function Sidebar({
               onClick={() => { onClose(); setTimeout(() => onOpenIdentity?.(), 300); }}
               className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer hover:opacity-80 transition-opacity"
             >
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shrink-0">
+              <div className="w-8 h-8 rounded-full bg-linear-to-br from-blue-600 to-indigo-600 flex items-center justify-center shrink-0">
                 <User size={13} className="text-zinc-100" />
               </div>
               <div className="flex-1 min-w-0 text-left">
-                <p className="text-[13px] font-medium text-zinc-100 truncate tracking-tight">
+                <p className="text-[13px] font-medium text-zinc-900 dark:text-zinc-100 truncate tracking-tight">
                   {userProfile?.displayName || "mine.ai User"}
                 </p>
                 <p className="text-[10px] text-zinc-500">{userProfile?.role || "Privacy First"}</p>
@@ -272,6 +286,26 @@ export function Sidebar({
           </div>
         </div>
       </aside>
+
+      {/* Themed Dialogs */}
+      <ConfirmDialog
+        isOpen={!!deleteConfirm}
+        title="Delete Conversation"
+        message="Are you sure you want to delete this conversation? This action cannot be undone."
+        confirmLabel="Delete"
+        destructive
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDeleteConfirm(null)}
+      />
+      <PromptDialog
+        isOpen={!!renamePrompt}
+        title="Rename Conversation"
+        defaultValue={renamePrompt?.currentTitle || ""}
+        placeholder="Conversation name"
+        confirmLabel="Rename"
+        onConfirm={handleConfirmRename}
+        onCancel={() => setRenamePrompt(null)}
+      />
     </>
   );
 }

@@ -81,7 +81,7 @@ export function ChatBubble({ message, bubbleStyle = "default", characterAvatar }
         "rounded-3xl",
         isAI
           ? "bg-zinc-900/60 text-zinc-100 border border-zinc-700/40 backdrop-blur-sm"
-          : "bg-gradient-to-br from-blue-600 to-purple-600 text-zinc-100 shadow-xl shadow-blue-600/20"
+          : "bg-linear-to-br from-blue-600 to-purple-600 text-zinc-100 shadow-xl shadow-blue-600/20"
       );
     }
     
@@ -101,7 +101,7 @@ export function ChatBubble({ message, bubbleStyle = "default", characterAvatar }
       "rounded-2xl",
       isAI
         ? "bg-zinc-900 text-zinc-100 rounded-tl-md border border-zinc-800/60"
-        : "bg-gradient-to-r from-blue-600 to-indigo-600 text-zinc-100 rounded-tr-md shadow-lg shadow-blue-600/10"
+        : "bg-linear-to-r from-blue-600 to-indigo-600 text-zinc-100 rounded-tr-md shadow-lg shadow-blue-600/10"
     );
   };
 

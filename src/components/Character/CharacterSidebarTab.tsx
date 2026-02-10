@@ -7,6 +7,7 @@ import { Plus, User, MessageSquare, Pencil, Trash2, MoreVertical } from "lucide-
 import { db, getAllCharacters, deleteCharacter, type Character } from "@/lib/db";
 import { CharacterWizard } from "./CharacterWizard";
 import { CharacterProfileSheet } from "./CharacterProfileSheet";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 interface CharacterSidebarTabProps {
   onSelectCharacter: (character: Character) => void;
@@ -113,6 +114,7 @@ interface CharacterCardProps {
 function CharacterCard({ character, isActive, onClick, onEdit, onViewProfile }: CharacterCardProps) {
   const [showMenu, setShowMenu] = useState(false);
   const [swiped, setSwiped] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const x = useMotionValue(0);
   const controls = useAnimation();
@@ -165,9 +167,7 @@ function CharacterCard({ character, isActive, onClick, onEdit, onViewProfile }: 
             aria-label={`Delete ${character.name}`}
             onClick={async () => {
               closeSwipe();
-              if (character.id && confirm(`Delete ${character.name}? This will also delete all associated chats.`)) {
-                await deleteCharacter(character.id);
-              }
+              setDeleteConfirm(true);
             }}
             className="flex items-center justify-center w-[70px] bg-red-600 text-white text-[11px] font-medium gap-1 flex-col"
           >
@@ -266,9 +266,7 @@ function CharacterCard({ character, isActive, onClick, onEdit, onViewProfile }: 
             onClick={async (e) => {
               e.stopPropagation();
               setShowMenu(false);
-              if (character.id && confirm(`Delete ${character.name}? This will also delete all associated chats.`)) {
-                await deleteCharacter(character.id);
-              }
+              setDeleteConfirm(true);
             }}
             className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-red-400 hover:bg-red-900/30 transition-colors text-left"
           >
@@ -277,6 +275,19 @@ function CharacterCard({ character, isActive, onClick, onEdit, onViewProfile }: 
           </button>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={deleteConfirm}
+        title="Delete Character"
+        message={`Delete ${character.name}? This will also delete all associated chats.`}
+        confirmLabel="Delete"
+        destructive
+        onConfirm={async () => {
+          setDeleteConfirm(false);
+          if (character.id) await deleteCharacter(character.id);
+        }}
+        onCancel={() => setDeleteConfirm(false)}
+      />
     </div>
   );
 }

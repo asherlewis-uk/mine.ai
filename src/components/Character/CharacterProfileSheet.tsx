@@ -72,13 +72,13 @@ export function CharacterProfileSheet({
               exit={{ opacity: 0, y: 20 }}
               className="fixed inset-x-4 top-[10%] md:inset-x-auto md:left-1/2 md:-translate-x-1/2 md:w-full md:max-w-lg z-50"
             >
-              <div className="bg-zinc-900 rounded-2xl shadow-2xl border border-zinc-800 overflow-hidden">
+              <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden">
                 {/* Header */}
                 <div className="relative">
                   {/* Close Button */}
                   <button
                     onClick={onClose}
-                    className="absolute top-4 right-4 text-zinc-400 hover:text-white transition-colors p-1 z-10"
+                    className="absolute top-4 right-4 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors p-1 z-10"
                   >
                     <X className="w-5 h-5" />
                   </button>
@@ -89,32 +89,32 @@ export function CharacterProfileSheet({
                       <img
                         src={character.avatar}
                         alt={character.name}
-                        className="w-24 h-24 rounded-full object-cover border-4 border-zinc-800 mb-4"
+                        className="w-24 h-24 rounded-full object-cover border-4 border-zinc-200 dark:border-zinc-800 mb-4"
                       />
                     ) : (
-                      <div className="w-24 h-24 rounded-full bg-zinc-800 border-4 border-zinc-700 flex items-center justify-center mb-4">
-                        <User className="w-10 h-10 text-zinc-600" />
+                      <div className="w-24 h-24 rounded-full bg-zinc-100 dark:bg-zinc-800 border-4 border-zinc-200 dark:border-zinc-700 flex items-center justify-center mb-4">
+                        <User className="w-10 h-10 text-zinc-400 dark:text-zinc-600" />
                       </div>
                     )}
-                    <h2 className="text-2xl font-bold text-white mb-1">{character.name}</h2>
-                    <p className="text-sm text-zinc-400">{character.subtitle}</p>
+                    <h2 className="text-2xl font-bold text-zinc-900 dark:text-white mb-1">{character.name}</h2>
+                    <p className="text-sm text-zinc-500 dark:text-zinc-400">{character.subtitle}</p>
                   </div>
                 </div>
 
                 {/* Description */}
                 {character.description && (
-                  <div className="px-6 py-4 border-t border-zinc-800">
+                  <div className="px-6 py-4 border-t border-zinc-200 dark:border-zinc-800">
                     <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-2">Bio</h3>
-                    <p className="text-sm text-zinc-300">{character.description}</p>
+                    <p className="text-sm text-zinc-700 dark:text-zinc-300">{character.description}</p>
                   </div>
                 )}
 
                 {/* System Prompt / Definition (Read-only) */}
                 {character.definition && (
-                  <div className="px-6 py-4 border-t border-zinc-800">
+                  <div className="px-6 py-4 border-t border-zinc-200 dark:border-zinc-800">
                     <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-2">System Prompt</h3>
                     <div className="max-h-[200px] overflow-y-auto">
-                      <pre className="text-xs text-zinc-400 whitespace-pre-wrap font-mono bg-zinc-800/50 rounded-lg p-3 border border-zinc-700/50">
+                      <pre className="text-xs text-zinc-600 dark:text-zinc-400 whitespace-pre-wrap font-mono bg-zinc-100 dark:bg-zinc-800/50 rounded-lg p-3 border border-zinc-200 dark:border-zinc-700/50">
                         {character.definition}
                       </pre>
                     </div>
@@ -122,45 +122,45 @@ export function CharacterProfileSheet({
                 )}
 
                 {/* Menu Options */}
-                <div className="px-4 py-4 border-t border-zinc-800 space-y-2">
+                <div className="px-4 py-4 border-t border-zinc-200 dark:border-zinc-800 space-y-2">
                   <button
                     onClick={() => setShowEditWizard(true)}
-                    className="w-full flex items-center gap-3 px-4 py-3 bg-zinc-800 hover:bg-zinc-700 rounded-lg transition-colors text-left"
+                    className="w-full flex items-center gap-3 px-4 py-3 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-lg transition-colors text-left"
                   >
                     <Edit className="w-5 h-5 text-blue-500" />
                     <div className="flex-1">
-                      <p className="text-sm font-medium text-white">Edit Character</p>
-                      <p className="text-xs text-zinc-400">Modify name, avatar, and personality</p>
+                      <p className="text-sm font-medium text-zinc-900 dark:text-white">Edit Character</p>
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400">Modify name, avatar, and personality</p>
                     </div>
                   </button>
 
                   <button
                     onClick={handleExport}
-                    className="w-full flex items-center gap-3 px-4 py-3 bg-zinc-800 hover:bg-zinc-700 rounded-lg transition-colors text-left"
+                    className="w-full flex items-center gap-3 px-4 py-3 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-lg transition-colors text-left"
                   >
                     <Download className="w-5 h-5 text-green-500" />
                     <div className="flex-1">
-                      <p className="text-sm font-medium text-white">Export Character</p>
-                      <p className="text-xs text-zinc-400">Download as JSON file</p>
+                      <p className="text-sm font-medium text-zinc-900 dark:text-white">Export Character</p>
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400">Download as JSON file</p>
                     </div>
                   </button>
 
                   <button
                     onClick={() => setShowDeleteConfirm(true)}
-                    className="w-full flex items-center gap-3 px-4 py-3 bg-zinc-800 hover:bg-red-900/50 rounded-lg transition-colors text-left"
+                    className="w-full flex items-center gap-3 px-4 py-3 bg-zinc-100 dark:bg-zinc-800 hover:bg-red-50 dark:hover:bg-red-900/50 rounded-lg transition-colors text-left"
                   >
                     <Trash2 className="w-5 h-5 text-red-500" />
                     <div className="flex-1">
-                      <p className="text-sm font-medium text-white">Delete Character</p>
-                      <p className="text-xs text-zinc-400">Permanently remove this character</p>
+                      <p className="text-sm font-medium text-zinc-900 dark:text-white">Delete Character</p>
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400">Permanently remove this character</p>
                     </div>
                   </button>
                 </div>
 
                 {/* Delete Confirmation */}
                 {showDeleteConfirm && (
-                  <div className="px-4 py-4 border-t border-zinc-800 bg-red-900/20">
-                    <p className="text-sm text-white mb-3">
+                  <div className="px-4 py-4 border-t border-zinc-200 dark:border-zinc-800 bg-red-50 dark:bg-red-900/20">
+                    <p className="text-sm text-zinc-800 dark:text-white mb-3">
                       Are you sure you want to delete <strong>{character.name}</strong>? This will also delete all associated chat history.
                     </p>
                     <div className="flex gap-2">
@@ -172,7 +172,7 @@ export function CharacterProfileSheet({
                       </button>
                       <button
                         onClick={() => setShowDeleteConfirm(false)}
-                        className="flex-1 px-4 py-2 bg-zinc-700 hover:bg-zinc-600 text-white rounded-lg transition-colors"
+                        className="flex-1 px-4 py-2 bg-zinc-200 dark:bg-zinc-700 hover:bg-zinc-300 dark:hover:bg-zinc-600 text-zinc-900 dark:text-white rounded-lg transition-colors"
                       >
                         Cancel
                       </button>

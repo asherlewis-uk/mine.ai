@@ -28,6 +28,7 @@ import { ChatHeader } from "@/components/ChatHeader";
 import { ChatArea } from "@/components/ChatArea";
 import { ChatInput } from "@/components/ChatInput";
 import { CharacterProfileSheet } from "@/components/Character/CharacterProfileSheet";
+import { ConfirmDialog, PromptDialog, SelectDialog } from "@/components/ConfirmDialog";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 export default function MineAIChat() {
@@ -42,6 +43,8 @@ export default function MineAIChat() {
   const [activeCharacter, setActiveCharacter] = useState<Character | null>(null);
   const [modelStatus, setModelStatus] = useState<"online" | "offline" | "unknown">("unknown");
   const [errorToast, setErrorToast] = useState<string | null>(null);
+  const [keyboardOffset, setKeyboardOffset] = useState(0);
+  const [clearChatConfirm, setClearChatConfirm] = useState(false);
   const errorToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -164,6 +167,7 @@ export default function MineAIChat() {
     // ═══ JUST-IN-TIME FETCHING (PREVENT STALE STATE) ═══
     // Force-fetch fresh settings and thread state immediately before sending
     const settings = await getAllSettings();
+    const isIncognito = settings.incognito_active;
     const currentThread = await db.threads.get(threadId);
     
     // Fetch character directly from DB if thread is associated with one
@@ -196,20 +200,24 @@ export default function MineAIChat() {
       }
     }
 
-    // Add user message to DB (display version with filename)
-    await addMessage(threadId, "user", displayMessage);
+    // Add user message to DB (display version with filename) — skip in incognito
+    if (!isIncognito) {
+      await addMessage(threadId, "user", displayMessage);
+    }
     // Don't clear input yet — only clear after successful stream
     setIsTyping(true);
 
-    // Prepare AI message
+    // Prepare AI message — in incognito, use in-memory only
     const aiMessageId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    await db.messages.add({
-      id: aiMessageId,
-      threadId,
-      role: "ai",
-      content: "",
-      timestamp: new Date(),
-    });
+    if (!isIncognito) {
+      await db.messages.add({
+        id: aiMessageId,
+        threadId,
+        role: "ai",
+        content: "",
+        timestamp: new Date(),
+      });
+    }
 
     // ═══ SYSTEM PROMPT CONSTRUCTION ═══
     // Build the system prompt strictly from character data or use safe default
@@ -283,6 +291,31 @@ export default function MineAIChat() {
     let accumulatedRawContent = "";
     let accumulatedThinking = "";
 
+    // ── Throttle DB writes during streaming ──
+    // Without throttling, updateMessage fires on every token (~10-50ms apart),
+    // which triggers useLiveQuery re-renders at the same rate. Throttling to
+    // ~80ms intervals reduces DB writes by ~5-10x while keeping the UI responsive.
+    let pendingUpdate: Partial<{ content: string; thinking: string }> | null = null;
+    let flushTimer: ReturnType<typeof setTimeout> | null = null;
+    const THROTTLE_MS = 80;
+
+    const flushPendingUpdate = () => {
+      if (pendingUpdate && !isIncognito) {
+        updateMessage(aiMessageId, pendingUpdate).catch((err) => {
+          console.error("Failed to update message:", err);
+        });
+        pendingUpdate = null;
+      }
+      flushTimer = null;
+    };
+
+    const throttledUpdateMessage = (updates: Partial<{ content: string; thinking: string }>) => {
+      pendingUpdate = updates;
+      if (!flushTimer) {
+        flushTimer = setTimeout(flushPendingUpdate, THROTTLE_MS);
+      }
+    };
+
     // Helper: parse <think> tags from streamed content
     const separateThinkTags = (raw: string): { content: string; thinking: string } => {
       let thinking = '';
@@ -320,29 +353,35 @@ export default function MineAIChat() {
           accumulatedRawContent += chunk;
           const parsed = separateThinkTags(accumulatedRawContent);
           const mergedThinking = [accumulatedThinking, parsed.thinking].filter(Boolean).join('\n');
-          updateMessage(aiMessageId, {
-            content: parsed.content,
-            ...(mergedThinking ? { thinking: mergedThinking } : {}),
-          }).catch((err) => {
-            console.error("Failed to update message:", err);
-          });
+          if (!isIncognito) {
+            throttledUpdateMessage({
+              content: parsed.content,
+              ...(mergedThinking ? { thinking: mergedThinking } : {}),
+            });
+          }
         },
         onThinking: (thinking) => {
           if (settings.thinkingEnabled) {
             accumulatedThinking += thinking;
-            updateMessage(aiMessageId, { thinking: accumulatedThinking }).catch((err) => {
-              console.error("Failed to update thinking:", err);
-            });
+            if (!isIncognito) {
+              throttledUpdateMessage({ thinking: accumulatedThinking });
+            }
           }
         },
         onComplete: () => {
+          // Flush any remaining buffered content to DB immediately
+          if (flushTimer) clearTimeout(flushTimer);
+          flushPendingUpdate();
           setIsTyping(false);
           setInputValue(""); // Clear input on success
           abortControllerRef.current = null;
         },
         onError: (error) => {
+          // Cancel any pending throttled write
+          if (flushTimer) clearTimeout(flushTimer);
           // Don't show error if user manually aborted
           if (error.name === "AbortError") {
+            flushPendingUpdate(); // Save whatever we accumulated
             setIsTyping(false);
             setInputValue(""); // user intentionally stopped
             abortControllerRef.current = null;
@@ -356,8 +395,10 @@ export default function MineAIChat() {
           const userMsg = error instanceof NetworkError
             ? error.userMessage
             : `Error: ${error.message}`;
-          // Remove the empty AI placeholder message
-          db.messages.delete(aiMessageId).catch(() => {});
+          // Remove the empty AI placeholder message (if persisted)
+          if (!isIncognito) {
+            db.messages.delete(aiMessageId).catch(() => {});
+          }
           showErrorToast(`${userMsg} — check your API settings and connection.`);
           setIsTyping(false);
           // Input is NOT cleared — user can retry
@@ -366,17 +407,24 @@ export default function MineAIChat() {
     } catch (error) {
       console.error("Failed to send message:", error);
       setModelStatus("offline");
-      // Remove the empty AI placeholder message
-      db.messages.delete(aiMessageId).catch(() => {});
+      // Remove the empty AI placeholder message (if persisted)
+      if (!isIncognito) {
+        db.messages.delete(aiMessageId).catch(() => {});
+      }
       showErrorToast("Unexpected error occurred. Please try again.");
       setIsTyping(false);
       // Input is NOT cleared — user can retry
     }
-  }, [isTyping, activeThreadId]); // isTyping guards re-entry; activeThreadId for thread context. DB reads are JIT-fetched (not closured).
+  }, [isTyping, activeThreadId, showErrorToast]); // isTyping guards re-entry; activeThreadId for thread context; showErrorToast is stable ([] deps). DB reads are JIT-fetched (not closured).
 
   const handleClearChat = useCallback(async () => {
     if (!activeThreadId) return;
-    if (!confirm("Clear this conversation? This action cannot be undone.")) return;
+    setClearChatConfirm(true);
+  }, [activeThreadId]);
+
+  const handleConfirmClearChat = useCallback(async () => {
+    setClearChatConfirm(false);
+    if (!activeThreadId) return;
 
     await db.messages.where("threadId").equals(activeThreadId).delete();
     
@@ -495,6 +543,7 @@ export default function MineAIChat() {
           bubbleStyle={bubbleStyle as any}
           characterAvatar={activeCharacter?.avatar}
           onSuggestionClick={(text) => handleSend(text)}
+          keyboardOffset={keyboardOffset}
         />
         <div ref={scrollRef} />
 
@@ -505,21 +554,22 @@ export default function MineAIChat() {
           onSubmit={(message, file) => handleSend(message, file)}
           isTyping={isTyping}
           onStop={handleStop}
+          onKeyboardOffset={setKeyboardOffset}
         />
 
         {/* ── Glassmorphism Error Toast ── */}
         {errorToast && (
           <div className="absolute bottom-24 left-1/2 -translate-x-1/2 z-50 max-w-sm w-[90%] animate-in fade-in slide-in-from-bottom-4 duration-300">
             <div
-              className="flex items-start gap-3 rounded-2xl border border-red-500/20 bg-red-950/60 px-4 py-3 shadow-lg backdrop-blur-xl"
+              className="flex items-start gap-3 rounded-2xl border border-red-300/30 dark:border-red-500/20 bg-red-100/80 dark:bg-red-950/60 px-4 py-3 shadow-lg backdrop-blur-xl"
               role="alert"
             >
-              <span className="mt-0.5 shrink-0 text-red-400">&#x26A0;</span>
-              <p className="flex-1 text-sm text-red-200 leading-snug">{errorToast}</p>
+              <span className="mt-0.5 shrink-0 text-red-500 dark:text-red-400">&#x26A0;</span>
+              <p className="flex-1 text-sm text-red-700 dark:text-red-200 leading-snug">{errorToast}</p>
               <button
                 type="button"
                 onClick={() => setErrorToast(null)}
-                className="shrink-0 text-red-400/60 hover:text-red-300 transition-colors"
+                className="shrink-0 text-red-400/60 hover:text-red-500 dark:hover:text-red-300 transition-colors"
                 aria-label="Dismiss"
               >
                 &#x2715;
@@ -527,6 +577,17 @@ export default function MineAIChat() {
             </div>
           </div>
         )}
+
+        {/* ── Themed Clear Chat Confirm Dialog ── */}
+        <ConfirmDialog
+          isOpen={clearChatConfirm}
+          title="Clear Conversation"
+          message="Clear this conversation? This action cannot be undone."
+          confirmLabel="Clear"
+          destructive
+          onConfirm={handleConfirmClearChat}
+          onCancel={() => setClearChatConfirm(false)}
+        />
       </main>
     </div>
   );

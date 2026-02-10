@@ -1,4 +1,4 @@
-import { useRef, useEffect, useLayoutEffect, useState } from "react";
+import { useRef, useEffect, useLayoutEffect, useState, useMemo } from "react";
 import { AnimatePresence } from "framer-motion";
 import { useLiveQuery } from "dexie-react-hooks";
 import { ChatBubble } from "./ChatBubble";
@@ -14,9 +14,10 @@ interface ChatAreaProps {
   bubbleStyle?: "default" | "modern" | "compact";
   characterAvatar?: string; // Optional character avatar
   onSuggestionClick?: (text: string) => void;
+  keyboardOffset?: number;
 }
 
-export function ChatArea({ threadId, isTyping, bubbleStyle = "default", characterAvatar, onSuggestionClick }: ChatAreaProps) {
+export function ChatArea({ threadId, isTyping, bubbleStyle = "default", characterAvatar, onSuggestionClick, keyboardOffset = 0 }: ChatAreaProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -33,11 +34,17 @@ export function ChatArea({ threadId, isTyping, bubbleStyle = "default", characte
 
   // Auto-scroll to bottom when messages change (including streaming content updates)
   // useLiveQuery re-fires on every Dexie update, so this catches streaming tokens too
+  // Use "instant" during streaming to prevent stacking smooth scroll animations
+  const isTypingRef = useRef(isTyping);
+  isTypingRef.current = isTyping;
+
   useLayoutEffect(() => {
     if (!messages || messages.length === 0) return;
     // Small delay to let the DOM update with new content
     requestAnimationFrame(() => {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      messagesEndRef.current?.scrollIntoView({
+        behavior: isTypingRef.current ? "instant" : "smooth",
+      });
     });
   }, [messages]);
 
@@ -62,11 +69,11 @@ export function ChatArea({ threadId, isTyping, bubbleStyle = "default", characte
   const [showIndicator, setShowIndicator] = useState(false);
   
   const lastMessage = messages && messages.length > 0 ? messages[messages.length - 1] : null;
-  const lastAiMessageHasContent = lastMessage?.role === "ai" && lastMessage.content.length > 0;
+  const lastAiMessageHasContent = lastMessage?.role === "ai" && (lastMessage.content?.trim().length ?? 0) > 0;
 
   useEffect(() => {
     if (isTyping && !lastAiMessageHasContent) {
-      // Show indicator: AI is typing but no content has arrived yet
+      // Show indicator: AI is typing but no non-whitespace content has arrived yet
       setShowIndicator(true);
     } else if (!isTyping && showIndicator) {
       // Stream finished — delay hiding to prevent flicker
@@ -79,7 +86,10 @@ export function ChatArea({ threadId, isTyping, bubbleStyle = "default", characte
   }, [isTyping, lastAiMessageHasContent, showIndicator]);
 
   return (
-    <div className="flex-1 overflow-y-auto overscroll-contain pt-[calc(60px+env(safe-area-inset-top))] pb-[calc(110px+env(safe-area-inset-bottom))]">
+    <div
+      className="flex-1 overflow-y-auto overscroll-contain pt-[calc(60px+env(safe-area-inset-top))]"
+      style={{ paddingBottom: keyboardOffset > 0 ? `${keyboardOffset + 70}px` : 'calc(110px + env(safe-area-inset-bottom))' }}
+    >
       {shouldShowWelcome ? (
         <WelcomeBanner onSuggestionClick={onSuggestionClick} />
       ) : (

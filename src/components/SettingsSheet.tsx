@@ -39,9 +39,10 @@ import {
   Image,
   Layers,
 } from "lucide-react";
-import { db, getSetting, setSetting, getAllSettings, toggleArchiveThread, deleteThread, getFlexibleSetting, setFlexibleSetting, debugAllSettings } from "@/lib/db";
+import { db, getSetting, setSetting, setThemeSettings, getAllSettings, toggleArchiveThread, deleteThread, getFlexibleSetting, setFlexibleSetting, debugAllSettings } from "@/lib/db";
 import { fetchModels } from "@/lib/api";
 import { THEME_PRESETS, hexToHSL } from "./ThemeManager";
+import { AlertDialog, ConfirmDialog, PromptDialog, SelectDialog } from "./ConfirmDialog";
 
 // ─── Types ───────────────────────────────────────────────────────
 type Screen = "root" | "security" | "data" | "about" | "ai" | "appearance" | "archived" | "identity";
@@ -296,9 +297,14 @@ function AISettingsScreen({ onBack }: { onBack: () => void }) {
   const [availableModels, setAvailableModels] = useState<string[]>([]);
   const [isFetchingModels, setIsFetchingModels] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<"idle" | "testing" | "success" | "error">("idle");
+  const [alertInfo, setAlertInfo] = useState<{ title: string; message: string } | null>(null);
+  const hasInitializedRef = useRef(false);
 
+  // Sync DB → local state only on initial load (not on every DB update)
+  // to prevent overwriting in-progress user edits with stale values
   useEffect(() => {
-    if (settings) {
+    if (settings && !hasInitializedRef.current) {
+      hasInitializedRef.current = true;
       setLocalApiUrl(settings.apiUrl);
       setLocalModelName(settings.modelName);
       setLocalTemperature(settings.temperature);
@@ -309,31 +315,29 @@ function AISettingsScreen({ onBack }: { onBack: () => void }) {
   }, [settings]);
 
   // Auto-save temperature on change (debounced)
+  // Only depend on the local value, NOT on settings, to prevent write→query→write loops
   useEffect(() => {
-    if (!settings) return;
     const timer = setTimeout(() => {
       setSetting("temperature", localTemperature);
     }, 300);
     return () => clearTimeout(timer);
-  }, [localTemperature, settings]);
+  }, [localTemperature]);
 
   // Auto-save top_p on change (debounced)
   useEffect(() => {
-    if (!settings) return;
     const timer = setTimeout(() => {
       setSetting("top_p", localTopP);
     }, 300);
     return () => clearTimeout(timer);
-  }, [localTopP, settings]);
+  }, [localTopP]);
 
   // Auto-save context length on change (debounced)
   useEffect(() => {
-    if (!settings) return;
     const timer = setTimeout(() => {
       setSetting("context_length", localContextLength);
     }, 300);
     return () => clearTimeout(timer);
-  }, [localContextLength, settings]);
+  }, [localContextLength]);
 
   // Fetch models when API URL changes
   useEffect(() => {
@@ -357,7 +361,7 @@ function AISettingsScreen({ onBack }: { onBack: () => void }) {
 
   const handleTestConnection = async () => {
     if (!localApiUrl) {
-      alert("Please enter an API URL first.");
+      setAlertInfo({ title: "Missing URL", message: "Please enter an API URL first." });
       return;
     }
 
@@ -404,7 +408,7 @@ function AISettingsScreen({ onBack }: { onBack: () => void }) {
           <button
             type="button"
             onClick={handleSave}
-            className="flex h-10 items-center justify-center rounded-full border border-zinc-700 px-4 text-[15px] text-zinc-300 active:bg-zinc-800"
+            className="flex h-10 items-center justify-center rounded-full border border-zinc-300 dark:border-zinc-700 px-4 text-[15px] text-zinc-700 dark:text-zinc-300 active:bg-zinc-100 dark:active:bg-zinc-800"
           >
             Save
           </button>
@@ -418,7 +422,7 @@ function AISettingsScreen({ onBack }: { onBack: () => void }) {
               value={localApiUrl}
               onChange={(e) => setLocalApiUrl(e.target.value)}
               placeholder="http://192.168.1.100:11434"
-              className="w-full bg-transparent text-[15px] text-zinc-200 outline-none placeholder:text-zinc-600"
+              className="w-full bg-transparent text-[15px] text-zinc-900 dark:text-zinc-200 outline-none placeholder:text-zinc-400 dark:placeholder:text-zinc-600"
             />
           </div>
           <div className="px-4 pb-3">
@@ -451,7 +455,7 @@ function AISettingsScreen({ onBack }: { onBack: () => void }) {
               <select
                 value={localModelName}
                 onChange={(e) => setLocalModelName(e.target.value)}
-                className="w-full rounded-xl bg-zinc-800 px-4 py-3 text-[15px] text-zinc-200 outline-none border border-zinc-700"
+                className="w-full rounded-xl bg-zinc-100 dark:bg-zinc-800 px-4 py-3 text-[15px] text-zinc-900 dark:text-zinc-200 outline-none border border-zinc-300 dark:border-zinc-700"
               >
                 {availableModels.map((model) => (
                   <option key={model} value={model}>
@@ -465,7 +469,7 @@ function AISettingsScreen({ onBack }: { onBack: () => void }) {
                 value={localModelName}
                 onChange={(e) => setLocalModelName(e.target.value)}
                 placeholder="llama2"
-                className="w-full bg-transparent text-[15px] text-zinc-200 outline-none placeholder:text-zinc-600"
+                className="w-full bg-transparent text-[15px] text-zinc-900 dark:text-zinc-200 outline-none placeholder:text-zinc-400 dark:placeholder:text-zinc-600"
                 disabled={isFetchingModels}
               />
             )}
@@ -505,7 +509,7 @@ function AISettingsScreen({ onBack }: { onBack: () => void }) {
             <select
               value={localContextLength}
               onChange={(e) => setLocalContextLength(parseInt(e.target.value))}
-              className="w-full rounded-xl bg-zinc-800 px-4 py-3 text-[15px] text-zinc-200 outline-none border border-zinc-700"
+              className="w-full rounded-xl bg-zinc-100 dark:bg-zinc-800 px-4 py-3 text-[15px] text-zinc-900 dark:text-zinc-200 outline-none border border-zinc-300 dark:border-zinc-700"
             >
               <option value={2048}>2,048 tokens</option>
               <option value={4096}>4,096 tokens</option>
@@ -532,6 +536,13 @@ function AISettingsScreen({ onBack }: { onBack: () => void }) {
           />
         </Section>
       </div>
+
+      <AlertDialog
+        isOpen={!!alertInfo}
+        title={alertInfo?.title ?? ""}
+        message={alertInfo?.message ?? ""}
+        onClose={() => setAlertInfo(null)}
+      />
     </div>
   );
 }
@@ -540,6 +551,10 @@ function SecurityScreen({ onBack }: { onBack: () => void }) {
   const biometricEnabled = useLiveQuery(() => getSetting("security_biometric"));
   const incognitoActive = useLiveQuery(() => getSetting("incognito_active"));
   const autoLockTimeout = useLiveQuery(() => getSetting("auto_lock_timeout"));
+
+  // Themed dialog state
+  const [alertInfo, setAlertInfo] = useState<{ title: string; message: string } | null>(null);
+  const [autoLockOpen, setAutoLockOpen] = useState(false);
 
   const handleBiometricToggle = async (value: boolean) => {
     if (value) {
@@ -562,7 +577,7 @@ function SecurityScreen({ onBack }: { onBack: () => void }) {
           // If we get here, authentication succeeded
           await setSetting("security_biometric", true);
         } else {
-          alert("Biometric authentication is not available on this device. Please set up Face ID or Touch ID in your device settings.");
+          setAlertInfo({ title: "Biometrics Unavailable", message: "Biometric authentication is not available on this device. Please set up Face ID or Touch ID in your device settings." });
         }
       } catch (err: any) {
         // Check if Capacitor plugin is not available (web environment)
@@ -570,16 +585,16 @@ function SecurityScreen({ onBack }: { onBack: () => void }) {
           // Web fallback — no native biometrics available
           const supportsWebAuthn = typeof window !== "undefined" && window.PublicKeyCredential;
           if (supportsWebAuthn) {
-            alert("🔐 Biometric lock requires a native app build (iOS/Android).\n\nWeb Authentication (WebAuthn) is available but biometric lock works best in the native app.");
+            setAlertInfo({ title: "Biometric Lock", message: "Biometric lock requires a native app build (iOS/Android).\n\nWeb Authentication (WebAuthn) is available but biometric lock works best in the native app." });
           } else {
-            alert("🔐 Biometric authentication is not available in the browser.\n\nPlease use the native iOS or Android app for biometric lock support.");
+            setAlertInfo({ title: "Biometric Lock", message: "Biometric authentication is not available in the browser.\n\nPlease use the native iOS or Android app for biometric lock support." });
           }
         } else if (err?.code === "AUTH_FAILED" || err?.message?.includes?.("cancel")) {
           // User cancelled or authentication failed
           console.log("Biometric enrollment cancelled by user");
         } else {
           console.error("Biometric error:", err);
-          alert("Biometric authentication failed. Please try again.");
+          setAlertInfo({ title: "Authentication Failed", message: "Biometric authentication failed. Please try again." });
         }
       }
     } else {
@@ -605,32 +620,23 @@ function SecurityScreen({ onBack }: { onBack: () => void }) {
   const handleIncognitoToggle = async (value: boolean) => {
     await setSetting("incognito_active", value);
     if (value) {
-      alert("🕵️ Incognito Mode enabled.\n\nYour conversations won't be saved to history until you disable this mode.");
+      setAlertInfo({ title: "Incognito Mode", message: "Incognito Mode enabled.\n\nYour conversations won't be saved to history until you disable this mode." });
     }
   };
 
   const handleAutoLockChange = async () => {
-    const options = ["1 minute", "5 minutes", "15 minutes", "30 minutes", "Never"];
-    const timeoutMap: Record<string, number> = {
-      "1 minute": 1,
-      "5 minutes": 5,
-      "15 minutes": 15,
-      "30 minutes": 30,
-      "Never": 0,
-    };
-
-    const current = autoLockTimeout || 5;
-    const currentLabel = current === 0 ? "Never" : `${current} minute${current > 1 ? "s" : ""}`;
-
-    const selection = prompt(`Select auto-lock timeout:\n\n${options.join("\n")}\n\nCurrent: ${currentLabel}`);
-    
-    if (selection && timeoutMap[selection] !== undefined) {
-      await setSetting("auto_lock_timeout", timeoutMap[selection]);
-    }
+    setAutoLockOpen(true);
   };
 
+  const autoLockOptions = ["1 minute", "5 minutes", "15 minutes", "30 minutes", "Never"];
+  const autoLockTimeoutMap: Record<string, number> = {
+    "1 minute": 1, "5 minutes": 5, "15 minutes": 15, "30 minutes": 30, "Never": 0,
+  };
+  const currentAutoLock = autoLockTimeout || 5;
+  const currentAutoLockLabel = currentAutoLock === 0 ? "Never" : `${currentAutoLock} minute${currentAutoLock > 1 ? "s" : ""}`;
+
   const handleChangePasscode = async () => {
-    alert("🔑 Change Passcode\n\nIn a production app, this would:\n1. Verify current passcode\n2. Prompt for new passcode\n3. Confirm new passcode\n4. Update secure storage");
+    setAlertInfo({ title: "Change Passcode", message: "In a production app, this would:\n1. Verify current passcode\n2. Prompt for new passcode\n3. Confirm new passcode\n4. Update secure storage" });
   };
 
   return (
@@ -677,6 +683,27 @@ function SecurityScreen({ onBack }: { onBack: () => void }) {
           />
         </Section>
       </div>
+
+      {/* Themed dialogs */}
+      <AlertDialog
+        isOpen={!!alertInfo}
+        title={alertInfo?.title ?? ""}
+        message={alertInfo?.message ?? ""}
+        onClose={() => setAlertInfo(null)}
+      />
+      <SelectDialog
+        isOpen={autoLockOpen}
+        title="Auto-lock Timeout"
+        options={autoLockOptions}
+        currentValue={currentAutoLockLabel}
+        onSelect={async (val) => {
+          if (autoLockTimeoutMap[val] !== undefined) {
+            await setSetting("auto_lock_timeout", autoLockTimeoutMap[val]);
+          }
+          setAutoLockOpen(false);
+        }}
+        onCancel={() => setAutoLockOpen(false)}
+      />
     </div>
   );
 }
@@ -684,6 +711,12 @@ function SecurityScreen({ onBack }: { onBack: () => void }) {
 function DataScreen({ onBack }: { onBack: () => void }) {
   const [isExporting, setIsExporting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Themed dialog state
+  const [alertInfo, setAlertInfo] = useState<{ title: string; message: string } | null>(null);
+  const [deleteAllConfirm, setDeleteAllConfirm] = useState(false);
+  const [deleteAllPrompt, setDeleteAllPrompt] = useState(false);
+  const [deleteHistoryConfirm, setDeleteHistoryConfirm] = useState(false);
 
   // HOOK FIX: useLiveQuery must be called at the top level of the component,
   // not inline inside JSX render expressions.
@@ -696,20 +729,25 @@ function DataScreen({ onBack }: { onBack: () => void }) {
     setIsExporting(false);
     
     if (success) {
-      alert("✅ Data exported successfully!\n\nCheck your downloads folder for the backup file.");
+      setAlertInfo({ title: "Export Successful", message: "Data exported successfully!\n\nCheck your downloads folder for the backup file." });
     } else {
-      alert("❌ Export failed.\n\nPlease try again or check the console for errors.");
+      setAlertInfo({ title: "Export Failed", message: "Export failed.\n\nPlease try again or check the console for errors." });
     }
   };
 
   const handleDeleteAll = async () => {
-    if (!confirm("⚠️ DELETE ALL DATA?\n\nThis will permanently delete:\n• All conversations\n• All messages\n• All settings\n\nThis action cannot be undone!")) {
-      return;
-    }
+    setDeleteAllConfirm(true);
+  };
 
-    const confirmText = prompt("Type 'DELETE' to confirm:");
-    if (confirmText !== "DELETE") {
-      alert("Deletion cancelled.");
+  const handleConfirmDeleteAll = () => {
+    setDeleteAllConfirm(false);
+    setDeleteAllPrompt(true);
+  };
+
+  const handleDeleteAllFinal = async (typed: string) => {
+    setDeleteAllPrompt(false);
+    if (typed !== "DELETE") {
+      setAlertInfo({ title: "Cancelled", message: "Deletion cancelled." });
       return;
     }
 
@@ -718,28 +756,29 @@ function DataScreen({ onBack }: { onBack: () => void }) {
       await db.threads.clear();
       await db.messages.clear();
       await db.settings.clear();
-      alert("All data deleted successfully. The app will now reload.");
-      window.location.reload();
+      setAlertInfo({ title: "Data Deleted", message: "All data deleted successfully. The app will now reload." });
+      setTimeout(() => window.location.reload(), 1500);
     } catch (error) {
       console.error("Delete failed:", error);
-      alert("Failed to delete data. Please try again.");
+      setAlertInfo({ title: "Delete Failed", message: "Failed to delete data. Please try again." });
       setIsDeleting(false);
     }
   };
 
   const handleDeleteHistory = async () => {
-    if (!confirm("🗑️ Delete all conversation history?\n\nThis will delete all threads and messages but keep your settings.\n\nContinue?")) {
-      return;
-    }
+    setDeleteHistoryConfirm(true);
+  };
 
+  const handleConfirmDeleteHistory = async () => {
+    setDeleteHistoryConfirm(false);
     try {
       await db.threads.clear();
       await db.messages.clear();
-      alert("✅ Conversation history deleted successfully.");
-      onBack();
+      setAlertInfo({ title: "History Deleted", message: "Conversation history deleted successfully." });
+      setTimeout(() => onBack(), 1000);
     } catch (error) {
       console.error("Delete history failed:", error);
-      alert("❌ Failed to delete history. Please try again.");
+      setAlertInfo({ title: "Delete Failed", message: "Failed to delete history. Please try again." });
     }
   };
 
@@ -781,25 +820,62 @@ function DataScreen({ onBack }: { onBack: () => void }) {
         <Section title="Storage">
           <div className="px-4 py-3">
             <div className="flex justify-between items-center mb-2">
-              <span className="text-[14px] text-zinc-400">Total conversations</span>
-              <span className="text-[14px] text-zinc-300">
+              <span className="text-[14px] text-zinc-600 dark:text-zinc-400">Total conversations</span>
+              <span className="text-[14px] text-zinc-800 dark:text-zinc-300">
                 {threadCount}
               </span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-[14px] text-zinc-400">Total messages</span>
-              <span className="text-[14px] text-zinc-300">
+              <span className="text-[14px] text-zinc-600 dark:text-zinc-400">Total messages</span>
+              <span className="text-[14px] text-zinc-800 dark:text-zinc-300">
                 {messageCount}
               </span>
             </div>
           </div>
         </Section>
       </div>
+
+      {/* Themed dialogs */}
+      <AlertDialog
+        isOpen={!!alertInfo}
+        title={alertInfo?.title ?? ""}
+        message={alertInfo?.message ?? ""}
+        onClose={() => setAlertInfo(null)}
+      />
+      <ConfirmDialog
+        isOpen={deleteAllConfirm}
+        title="Delete All Data"
+        message={"This will permanently delete:\n• All conversations\n• All messages\n• All settings\n\nThis action cannot be undone!"}
+        confirmLabel="Continue"
+        destructive
+        onConfirm={handleConfirmDeleteAll}
+        onCancel={() => setDeleteAllConfirm(false)}
+      />
+      <PromptDialog
+        isOpen={deleteAllPrompt}
+        title="Confirm Deletion"
+        message="Type 'DELETE' to confirm:"
+        placeholder="DELETE"
+        confirmLabel="Delete Everything"
+        onConfirm={handleDeleteAllFinal}
+        onCancel={() => setDeleteAllPrompt(false)}
+      />
+      <ConfirmDialog
+        isOpen={deleteHistoryConfirm}
+        title="Delete Conversation History"
+        message="This will delete all threads and messages but keep your settings."
+        confirmLabel="Delete History"
+        destructive
+        onConfirm={handleConfirmDeleteHistory}
+        onCancel={() => setDeleteHistoryConfirm(false)}
+      />
     </div>
   );
 }
 
 function AboutScreen({ onBack }: { onBack: () => void }) {
+  const [alertInfo, setAlertInfo] = useState<{ title: string; message: string } | null>(null);
+
   const handleReportBug = () => {
     const subject = encodeURIComponent("mine.ai Bug Report");
     const body = encodeURIComponent(
@@ -814,15 +890,15 @@ function AboutScreen({ onBack }: { onBack: () => void }) {
   };
 
   const handleHelpCenter = () => {
-    alert("📚 Help Center\n\nOpening help documentation...\n\nIn a production app, this would link to:\nhttps://help.mine-ai.app");
+    setAlertInfo({ title: "Help Center", message: "Opening help documentation...\n\nIn a production app, this would link to:\nhttps://help.mine-ai.app" });
   };
 
   const handleTermsOfUse = () => {
-    alert("📜 Terms of Use\n\nOpening terms of service...\n\nIn a production app, this would link to:\nhttps://mine-ai.app/terms");
+    setAlertInfo({ title: "Terms of Use", message: "Opening terms of service...\n\nIn a production app, this would link to:\nhttps://mine-ai.app/terms" });
   };
 
   const handlePrivacyPolicy = () => {
-    alert("🔒 Privacy Policy\n\nOpening privacy policy...\n\nIn a production app, this would link to:\nhttps://mine-ai.app/privacy");
+    setAlertInfo({ title: "Privacy Policy", message: "Opening privacy policy...\n\nIn a production app, this would link to:\nhttps://mine-ai.app/privacy" });
   };
 
   return (
@@ -848,10 +924,10 @@ function AboutScreen({ onBack }: { onBack: () => void }) {
           />
           <div className="flex items-center gap-3 px-4 py-3">
             <span className="flex h-5 w-5 shrink-0 items-center justify-center">
-              <span className="h-4 w-4 rounded-full bg-gradient-to-br from-blue-600 to-indigo-600" />
+              <span className="h-4 w-4 rounded-full bg-linear-to-br from-blue-600 to-indigo-600" />
             </span>
             <div className="flex flex-col">
-              <span className="text-[16px] text-zinc-100">mine.ai</span>
+              <span className="text-[16px] text-zinc-900 dark:text-zinc-100">mine.ai</span>
               <span className="text-[13px] text-zinc-500">Version 1.0.0</span>
             </div>
           </div>
@@ -859,15 +935,22 @@ function AboutScreen({ onBack }: { onBack: () => void }) {
 
         <Section title="About mine.ai">
           <div className="px-4 py-3">
-            <p className="text-[14px] text-zinc-400 leading-relaxed mb-3">
+            <p className="text-[14px] text-zinc-600 dark:text-zinc-400 leading-relaxed mb-3">
               mine.ai is a privacy-first, local-first AI chat application. All your conversations are stored locally in your browser using IndexedDB.
             </p>
-            <p className="text-[14px] text-zinc-400 leading-relaxed">
+            <p className="text-[14px] text-zinc-600 dark:text-zinc-400 leading-relaxed">
               Built with Next.js, Dexie.js, and Tailwind CSS. Designed for users who value privacy and control over their data.
             </p>
           </div>
         </Section>
       </div>
+
+      <AlertDialog
+        isOpen={!!alertInfo}
+        title={alertInfo?.title ?? ""}
+        message={alertInfo?.message ?? ""}
+        onClose={() => setAlertInfo(null)}
+      />
     </div>
   );
 }
@@ -878,14 +961,14 @@ function ArchivedScreen({ onBack }: { onBack: () => void }) {
     return threads.filter(t => t.archived === true).sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
   });
 
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+
   const handleUnarchive = async (threadId: string) => {
     await toggleArchiveThread(threadId);
   };
 
   const handleDelete = async (threadId: string) => {
-    if (confirm("Delete this archived conversation? This action cannot be undone.")) {
-      await deleteThread(threadId);
-    }
+    setDeleteConfirm(threadId);
   };
 
   return (
@@ -895,8 +978,8 @@ function ArchivedScreen({ onBack }: { onBack: () => void }) {
         {!archivedThreads || archivedThreads.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <Archive className="h-12 w-12 text-zinc-700 mb-3" />
-            <p className="text-zinc-400 text-[15px]">No archived conversations</p>
-            <p className="text-zinc-600 text-[13px] mt-1">Archived chats will appear here</p>
+            <p className="text-zinc-600 dark:text-zinc-400 text-[15px]">No archived conversations</p>
+            <p className="text-zinc-500 dark:text-zinc-600 text-[13px] mt-1">Archived chats will appear here</p>
           </div>
         ) : (
           <Section title={`${archivedThreads.length} Archived ${archivedThreads.length === 1 ? 'Chat' : 'Chats'}`}>
@@ -907,8 +990,8 @@ function ArchivedScreen({ onBack }: { onBack: () => void }) {
               >
                 <MessageSquare className="h-5 w-5 text-zinc-500 shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-[16px] text-zinc-300 truncate">{thread.title}</p>
-                  <p className="text-[13px] text-zinc-600">
+                  <p className="text-[16px] text-zinc-800 dark:text-zinc-300 truncate">{thread.title}</p>
+                  <p className="text-[13px] text-zinc-500 dark:text-zinc-600">
                     {new Date(thread.updatedAt).toLocaleDateString()}
                   </p>
                 </div>
@@ -933,6 +1016,19 @@ function ArchivedScreen({ onBack }: { onBack: () => void }) {
           </Section>
         )}
       </div>
+
+      <ConfirmDialog
+        isOpen={!!deleteConfirm}
+        title="Delete Archived Chat"
+        message="Delete this archived conversation? This action cannot be undone."
+        confirmLabel="Delete"
+        destructive
+        onConfirm={async () => {
+          if (deleteConfirm) await deleteThread(deleteConfirm);
+          setDeleteConfirm(null);
+        }}
+        onCancel={() => setDeleteConfirm(null)}
+      />
     </div>
   );
 }
@@ -1000,10 +1096,10 @@ function IdentityScreen({ onBack }: { onBack: () => void }) {
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
               placeholder="Your name"
-              className="w-full bg-transparent text-[15px] text-zinc-200 outline-none placeholder:text-zinc-600"
+              className="w-full bg-transparent text-[15px] text-zinc-900 dark:text-zinc-200 outline-none placeholder:text-zinc-400 dark:placeholder:text-zinc-600"
             />
           </div>
-          <div className="px-4 py-3 border-b border-zinc-800/60">
+          <div className="px-4 py-3 border-b border-zinc-200 dark:border-zinc-800/60">
             <label className="text-[11px] font-medium text-zinc-500 uppercase tracking-wider mb-1.5 block">
               Role / Title
             </label>
@@ -1012,10 +1108,10 @@ function IdentityScreen({ onBack }: { onBack: () => void }) {
               value={role}
               onChange={(e) => setRole(e.target.value)}
               placeholder="e.g. Software Engineer"
-              className="w-full bg-transparent text-[15px] text-zinc-200 outline-none placeholder:text-zinc-600"
+              className="w-full bg-transparent text-[15px] text-zinc-900 dark:text-zinc-200 outline-none placeholder:text-zinc-400 dark:placeholder:text-zinc-600"
             />
           </div>
-          <div className="px-4 py-3 border-b border-zinc-800/60">
+          <div className="px-4 py-3 border-b border-zinc-200 dark:border-zinc-800/60">
             <label className="text-[11px] font-medium text-zinc-500 uppercase tracking-wider mb-1.5 block">
               Bio / Context
             </label>
@@ -1024,7 +1120,7 @@ function IdentityScreen({ onBack }: { onBack: () => void }) {
               onChange={(e) => setBio(e.target.value)}
               placeholder="e.g. I prefer concise answers. I use Python and TypeScript."
               rows={3}
-              className="w-full bg-transparent text-[15px] text-zinc-200 outline-none placeholder:text-zinc-600 resize-none leading-relaxed"
+              className="w-full bg-transparent text-[15px] text-zinc-900 dark:text-zinc-200 outline-none placeholder:text-zinc-400 dark:placeholder:text-zinc-600 resize-none leading-relaxed"
             />
           </div>
           <div className="px-4 py-3">
@@ -1036,16 +1132,16 @@ function IdentityScreen({ onBack }: { onBack: () => void }) {
               value={location}
               onChange={(e) => setLocation(e.target.value)}
               placeholder="e.g. San Francisco, CA"
-              className="w-full bg-transparent text-[15px] text-zinc-200 outline-none placeholder:text-zinc-600"
+              className="w-full bg-transparent text-[15px] text-zinc-900 dark:text-zinc-200 outline-none placeholder:text-zinc-400 dark:placeholder:text-zinc-600"
             />
           </div>
         </Section>
 
         <Section title="How It Works">
           <div className="px-4 py-3">
-            <p className="text-[14px] text-zinc-400 leading-relaxed">
+            <p className="text-[14px] text-zinc-600 dark:text-zinc-400 leading-relaxed">
               Your profile is injected into the AI system prompt as a{" "}
-              <span className="text-zinc-300 font-medium">[USER PROFILE]</span>{" "}
+              <span className="text-zinc-800 dark:text-zinc-300 font-medium">[USER PROFILE]</span>{" "}
               block, giving the model context about you without sharing raw
               data externally.
             </p>
@@ -1066,6 +1162,7 @@ function AppearanceScreen({ onBack }: { onBack: () => void }) {
   const themePreset = useLiveQuery(() => getFlexibleSetting("theme_preset", "default"));
 
   const [localWallpaper, setLocalWallpaper] = useState("");
+  const [alertInfo, setAlertInfo] = useState<{ title: string; message: string } | null>(null);
   const wallpaperFileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -1088,7 +1185,7 @@ function AppearanceScreen({ onBack }: { onBack: () => void }) {
 
     // Validate it's an image
     if (!file.type.startsWith("image/")) {
-      alert("Please select an image file.");
+      setAlertInfo({ title: "Invalid File", message: "Please select an image file." });
       return;
     }
 
@@ -1127,9 +1224,8 @@ function AppearanceScreen({ onBack }: { onBack: () => void }) {
       System: "system",
     };
     const mode = modeMap[value] || "dark";
-    // Write both keys atomically so they stay in sync (lowercase values)
-    await setSetting("appearance", value);
-    await setSetting("theme_mode", mode);
+    // Write both keys atomically in a Dexie transaction so they stay in sync
+    await setThemeSettings(value, mode);
   };
 
   const handleTextSizeChange = async (size: "small" | "medium" | "large") => {
@@ -1347,6 +1443,13 @@ function AppearanceScreen({ onBack }: { onBack: () => void }) {
         </Section>
 
       </div>
+
+      <AlertDialog
+        isOpen={!!alertInfo}
+        title={alertInfo?.title ?? ""}
+        message={alertInfo?.message ?? ""}
+        onClose={() => setAlertInfo(null)}
+      />
     </div>
   );
 }
@@ -1366,6 +1469,11 @@ export function SettingsSheet({
 }) {
   const [screen, setScreen] = useState<Screen>(defaultScreen || "root");
   const [availableModels, setAvailableModels] = useState<string[]>([]);
+
+  // Dialog state for root screen
+  const [alertInfo, setAlertInfo] = useState<{ title: string; message: string } | null>(null);
+  const [languageOpen, setLanguageOpen] = useState(false);
+  const [clearAllConfirm, setClearAllConfirm] = useState(false);
 
   // Load settings from DB (only for root screen toggles)
   const hapticEnabled = useLiveQuery(() => getSetting("haptic_enabled"));
@@ -1403,21 +1511,18 @@ export function SettingsSheet({
   };
 
   const handleSubscriptionClick = () => {
-    alert(`📱 Current Plan: ${subscriptionTier || "Free Plan"}\n\nIn a production app, this would show:\n• Current plan details\n• Usage statistics\n• Billing history\n• Plan management options`);
+    setAlertInfo({ title: "Current Plan", message: `Current Plan: ${subscriptionTier || "Free Plan"}\n\nIn a production app, this would show:\n• Current plan details\n• Usage statistics\n• Billing history\n• Plan management options` });
   };
 
   const handleUpgradeToPro = () => {
-    alert("🚀 Upgrade to Pro\n\nPro Features:\n• Unlimited conversations\n• Priority model access\n• Advanced customization\n• Priority support\n\nIn a production app, this would open the subscription flow.");
+    setAlertInfo({ title: "Upgrade to Pro", message: "Pro Features:\n• Unlimited conversations\n• Priority model access\n• Advanced customization\n• Priority support\n\nIn a production app, this would open the subscription flow." });
   };
 
   const handleLanguageClick = async () => {
-    const languages = ["English", "Spanish", "French", "German", "Japanese", "Chinese"];
-    const selection = prompt(`Select language:\n\n${languages.join("\n")}\n\nCurrent: ${appLanguage || "English"}`);
-    
-    if (selection && languages.includes(selection)) {
-      await setSetting("app_language", selection);
-    }
+    setLanguageOpen(true);
   };
+
+  const languages = ["English", "Spanish", "French", "German", "Japanese", "Chinese"];
 
   // Reset to root when closing, or set to defaultScreen when opening
   useEffect(() => {
@@ -1584,14 +1689,7 @@ export function SettingsSheet({
                 <Row
                   icon={<LogOut className="h-5 w-5" />}
                   label="Clear all data"
-                  onClick={() => {
-                    if (confirm("🗑️ Delete all threads and messages?\n\nYour settings will be preserved.\n\nContinue?")) {
-                      db.threads.clear();
-                      db.messages.clear();
-                      alert("✅ All conversations cleared.");
-                      onClose();
-                    }
-                  }}
+                  onClick={() => setClearAllConfirm(true)}
                   destructive
                   isLast
                 />
@@ -1600,6 +1698,40 @@ export function SettingsSheet({
           </>
         )}
       </div>
+
+      {/* Themed dialogs for root screen */}
+      <AlertDialog
+        isOpen={!!alertInfo}
+        title={alertInfo?.title ?? ""}
+        message={alertInfo?.message ?? ""}
+        onClose={() => setAlertInfo(null)}
+      />
+      <SelectDialog
+        isOpen={languageOpen}
+        title="Select Language"
+        options={languages}
+        currentValue={appLanguage || "English"}
+        onSelect={async (val) => {
+          await setSetting("app_language", val);
+          setLanguageOpen(false);
+        }}
+        onCancel={() => setLanguageOpen(false)}
+      />
+      <ConfirmDialog
+        isOpen={clearAllConfirm}
+        title="Clear All Data"
+        message="Delete all threads and messages? Your settings will be preserved."
+        confirmLabel="Clear All"
+        destructive
+        onConfirm={async () => {
+          setClearAllConfirm(false);
+          await db.threads.clear();
+          await db.messages.clear();
+          setAlertInfo({ title: "Data Cleared", message: "All conversations cleared." });
+          setTimeout(() => onClose(), 1000);
+        }}
+        onCancel={() => setClearAllConfirm(false)}
+      />
     </div>
   );
 }

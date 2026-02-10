@@ -19,7 +19,7 @@ export function WelcomeBanner({ onSuggestionClick }: WelcomeBannerProps) {
       transition={{ duration: 0.4, ease: "easeOut" }}
       className="flex flex-col items-center justify-center py-8 px-6"
     >
-      <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-600/20 to-indigo-600/20 border border-blue-500/10 flex items-center justify-center mb-4">
+      <div className="w-14 h-14 rounded-2xl bg-linear-to-br from-blue-600/20 to-indigo-600/20 border border-blue-500/10 flex items-center justify-center mb-4">
         <Sparkles size={26} className="text-blue-600 dark:text-blue-400" />
       </div>
       <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-1 text-balance text-center tracking-tight">

@@ -179,13 +179,13 @@ export function ThreadItem({ thread, isActive, openSwipeId, onSwipeOpen, onSwipe
       {showContextMenu && (
         <div
           ref={contextMenuRef}
-          className="absolute right-2 top-full mt-1 z-50 bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl overflow-hidden min-w-[160px]"
+          className="absolute right-2 top-full mt-1 z-50 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-xl overflow-hidden min-w-[160px]"
         >
           {onArchive && (
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); setShowContextMenu(false); onArchive(thread.id); }}
-              className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-zinc-300 hover:bg-zinc-800 transition-colors text-left"
+              className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-left"
             >
               <Archive size={14} />
               Archive
@@ -195,7 +195,7 @@ export function ThreadItem({ thread, isActive, openSwipeId, onSwipeOpen, onSwipe
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); setShowContextMenu(false); onDelete(thread.id); }}
-              className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-red-400 hover:bg-red-900/30 transition-colors text-left"
+              className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors text-left"
             >
               <Trash2 size={14} />
               Delete

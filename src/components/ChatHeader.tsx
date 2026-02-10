@@ -27,23 +27,21 @@ export function ChatHeader({
   const [lastFetchedUrl, setLastFetchedUrl] = useState<string | null>(null);
 
   // Fetch available models on mount with stale-while-revalidate caching.
-  // Skips re-fetching if models are already loaded for the current API URL.
+  // Dependencies include apiUrl via modelName reactivity + explicit refetch.
   useEffect(() => {
+    let cancelled = false;
     const loadModels = async () => {
       const settings = await getAllSettings();
       if (settings.apiUrl) {
-        // Skip fetch if we already have models for this URL
-        if (availableModels.length > 0 && lastFetchedUrl === settings.apiUrl) {
-          return;
-        }
         const result = await fetchModels(settings.apiUrl);
-        if (result.success && result.models.length > 0) {
+        if (!cancelled && result.success && result.models.length > 0) {
           setAvailableModels(result.models);
           setLastFetchedUrl(settings.apiUrl);
         }
       }
     };
     loadModels();
+    return () => { cancelled = true; };
   }, [modelName]); // Re-fetch when model changes (implies possible URL change)
 
   const handleModelChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -79,11 +77,11 @@ export function ChatHeader({
                 className="w-8 h-8 rounded-full object-cover"
               />
             ) : activeCharacter ? (
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center">
+              <div className="w-8 h-8 rounded-full bg-linear-to-br from-purple-600 to-pink-600 flex items-center justify-center">
                 <User size={14} className="text-zinc-100" />
               </div>
             ) : (
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shadow-blue-600/20">
+              <div className="w-8 h-8 rounded-full bg-linear-to-br from-blue-600 to-indigo-600 flex items-center justify-center shadow-blue-600/20">
                 <Sparkles size={14} className="text-zinc-100" />
               </div>
             )}
@@ -102,7 +100,7 @@ export function ChatHeader({
                 ))}
               </select>
             ) : (
-              <h1 className="text-[14px] font-semibold text-zinc-100 leading-tight tracking-tight truncate max-w-[200px]">
+              <h1 className="text-[14px] font-semibold text-zinc-900 dark:text-zinc-100 leading-tight tracking-tight truncate max-w-[200px]">
                 {activeCharacter?.name || modelName || 'mine.ai'}
               </h1>
             )}

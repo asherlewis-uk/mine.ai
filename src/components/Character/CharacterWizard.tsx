@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, ChevronLeft, ChevronRight, User, Image as ImageIcon, MessageSquare, FileText, Sparkles } from "lucide-react";
 import { createCharacter, updateCharacter, type Character } from "@/lib/db";
 import { Avatar } from "@/components/Avatar";
+import { AlertDialog } from "@/components/ConfirmDialog";
 
 interface CharacterWizardProps {
   isOpen: boolean;
@@ -25,7 +26,24 @@ export function CharacterWizard({ isOpen, onClose, onSave, existingCharacter }: 
   const [greetings, setGreetings] = useState<string[]>(existingCharacter?.greetings || []);
   const [useAiGreeting, setUseAiGreeting] = useState(existingCharacter?.useAiGreeting || false);
   const [currentGreeting, setCurrentGreeting] = useState("");
+  const [avatarSizeAlert, setAvatarSizeAlert] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Reset form state when the wizard opens or existingCharacter changes
+  // This prevents stale data from a previously viewed character lingering
+  React.useEffect(() => {
+    if (isOpen) {
+      setCurrentStep("name");
+      setName(existingCharacter?.name || "");
+      setAvatar(existingCharacter?.avatar || "");
+      setSubtitle(existingCharacter?.subtitle || "");
+      setDescription(existingCharacter?.description || "");
+      setDefinition(existingCharacter?.definition || "");
+      setGreetings(existingCharacter?.greetings || []);
+      setUseAiGreeting(existingCharacter?.useAiGreeting || false);
+      setCurrentGreeting("");
+    }
+  }, [isOpen, existingCharacter]);
 
   const steps: WizardStep[] = ["name", "photo", "greetings", "details"];
   const currentStepIndex = steps.indexOf(currentStep);
@@ -35,6 +53,13 @@ export function CharacterWizard({ isOpen, onClose, onSave, existingCharacter }: 
   const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    // Limit avatar size to 2MB to prevent IndexedDB bloat
+    const MAX_AVATAR_SIZE = 2 * 1024 * 1024; // 2MB
+    if (file.size > MAX_AVATAR_SIZE) {
+      setAvatarSizeAlert(`Image is too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Please choose an image under 2MB.`);
+      return;
+    }
 
     const reader = new FileReader();
     reader.onloadend = () => {
@@ -127,6 +152,7 @@ export function CharacterWizard({ isOpen, onClose, onSave, existingCharacter }: 
   };
 
   return (
+    <>
     <AnimatePresence>
       {isOpen && (
         <>
@@ -436,5 +462,13 @@ export function CharacterWizard({ isOpen, onClose, onSave, existingCharacter }: 
         </>
       )}
     </AnimatePresence>
+
+    <AlertDialog
+      isOpen={!!avatarSizeAlert}
+      title="Image Too Large"
+      message={avatarSizeAlert ?? ""}
+      onClose={() => setAvatarSizeAlert(null)}
+    />
+    </>
   );
 }

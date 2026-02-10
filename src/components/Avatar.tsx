@@ -27,7 +27,7 @@ export function Avatar({ role, className, characterAvatar }: AvatarProps) {
         "flex items-center justify-center rounded-full shrink-0 w-8 h-8",
         role === "ai"
           ? "bg-zinc-800 text-blue-400"
-          : "bg-gradient-to-br from-blue-600 to-indigo-600 text-zinc-100",
+          : "bg-linear-to-br from-blue-600 to-indigo-600 text-zinc-100",
         className,
       )}
     >
