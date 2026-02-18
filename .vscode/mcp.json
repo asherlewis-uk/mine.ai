@@ -1,9 +1,5 @@
 {
   "servers": {
-    "immunity-agent": {
-      "command": "node",
-      "args": ["${workspaceFolder}/tools/mcp-server/dist/index.js"]
-    },
     "filesystem": {
       "command": "node",
       "args": [
