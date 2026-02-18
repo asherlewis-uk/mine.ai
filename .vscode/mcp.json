@@ -1,0 +1,23 @@
+{
+  "servers": {
+    "immunity-agent": {
+      "command": "node",
+      "args": ["${workspaceFolder}/tools/mcp-server/dist/index.js"]
+    },
+    "filesystem": {
+      "command": "node",
+      "args": [
+        "${workspaceFolder}/node_modules/@modelcontextprotocol/server-filesystem/dist/index.js",
+        "."
+      ]
+    },
+    "memory": {
+      "command": "node",
+      "args": ["${workspaceFolder}/node_modules/@modelcontextprotocol/server-memory/dist/index.js"]
+    },
+    "github": {
+      "command": "node",
+      "args": ["${workspaceFolder}/node_modules/@modelcontextprotocol/server-github/dist/index.js"]
+    }
+  }
+}
