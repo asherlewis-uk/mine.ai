@@ -1,0 +1,36 @@
+.action-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border-radius: 9999px;
+  border: 1.5px solid rgba(0, 229, 204, 0.5);
+  background: rgba(0, 229, 204, 0.06);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+  white-space: nowrap;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.action-pill:hover {
+  border-color: rgba(0, 229, 204, 0.8);
+  background: rgba(0, 229, 204, 0.1);
+  box-shadow: 0 0 12px rgba(0, 229, 204, 0.15);
+}
+
+.action-pill:active {
+  background: rgba(0, 229, 204, 0.15);
+}
+
+.action-pill-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  color: rgba(0, 229, 204, 0.8);
+}

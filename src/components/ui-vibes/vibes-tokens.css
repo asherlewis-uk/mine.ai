@@ -1,0 +1,48 @@
+/* ─── UI Vibes Design Tokens ─────────────────────────────────────
+   Extracted from @21st-dev/magic MCP output + reference images.
+   Two accent modes: spectral-edge (default) and teal-core.
+   ──────────────────────────────────────────────────────────────── */
+
+:root {
+  /* Surface */
+  --vibes-bg: #080808;
+  --vibes-surface: rgba(8, 8, 8, 0.85);
+  --vibes-surface-elevated: rgba(16, 16, 16, 0.9);
+
+  /* Teal palette */
+  --vibes-teal: #00e5cc;
+  --vibes-teal-rgb: 0, 229, 204;
+
+  /* Spectral palette */
+  --vibes-spectral-green: rgba(0, 255, 127, 0.8);
+  --vibes-spectral-cyan: rgba(0, 229, 204, 0.8);
+  --vibes-spectral-magenta: rgba(255, 0, 255, 0.8);
+  --vibes-spectral-orange: rgba(255, 165, 0, 0.8);
+
+  /* Border */
+  --vibes-border-width: 1.5px;
+  --vibes-border-radius-card: 24px;
+  --vibes-border-radius-hero: 28px;
+  --vibes-border-radius-pill: 9999px;
+  --vibes-border-radius-container: 16px;
+
+  /* Glow */
+  --vibes-glow-blur: 24px;
+  --vibes-glow-spread: 10px;
+
+  /* Spacing */
+  --vibes-spacing-xs: 8px;
+  --vibes-spacing-sm: 12px;
+  --vibes-spacing-md: 16px;
+  --vibes-spacing-lg: 24px;
+  --vibes-spacing-xl: 32px;
+
+  /* FAB */
+  --vibes-fab-size: 44px;
+
+  /* Typography */
+  --vibes-text-hero: 1.75rem;
+  --vibes-text-subtitle: 0.9375rem;
+  --vibes-text-body: 0.875rem;
+  --vibes-text-small: 0.8125rem;
+}

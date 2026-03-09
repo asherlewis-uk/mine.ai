@@ -1,0 +1,187 @@
+/* ── Overlay backdrop ─────────────────────────────────────────── */
+.nav-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 40;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s;
+}
+
+.nav-drawer-backdrop--open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* ── Drawer panel ─────────────────────────────────────────────── */
+.nav-drawer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 300px;
+  max-width: 85vw;
+  z-index: 50;
+  background: rgba(8, 8, 8, 0.92);
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  border-right: 1.5px solid rgba(0, 229, 204, 0.3);
+  border-radius: 0 24px 24px 0;
+  box-shadow: 4px 0 40px rgba(0, 229, 204, 0.08);
+  transform: translateX(-100%);
+  transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.nav-drawer--open {
+  transform: translateX(0);
+}
+
+/* ── Left accent strip ────────────────────────────────────────── */
+.nav-drawer::before {
+  content: '';
+  position: absolute;
+  top: 10%;
+  left: 0;
+  bottom: 10%;
+  width: 2px;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(0, 229, 204, 0.6) 30%,
+    rgba(0, 229, 204, 0.6) 70%,
+    transparent 100%
+  );
+}
+
+/* ── Glow behind drawer ───────────────────────────────────────── */
+.nav-drawer::after {
+  content: '';
+  position: absolute;
+  top: 5%;
+  left: -20px;
+  bottom: 5%;
+  width: 40px;
+  background: rgba(0, 229, 204, 0.15);
+  filter: blur(24px);
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* ── Header ───────────────────────────────────────────────────── */
+.nav-drawer-header {
+  padding: 24px 20px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.nav-drawer-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+  margin: 0 0 12px;
+}
+
+.nav-drawer-divider {
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    rgba(0, 229, 204, 0.5),
+    rgba(0, 229, 204, 0.1) 80%,
+    transparent
+  );
+}
+
+/* ── User profile section ─────────────────────────────────────── */
+.nav-drawer-profile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+}
+
+.nav-drawer-profile-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.nav-drawer-profile-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.nav-drawer-profile-name {
+  font-size: 1rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* ── Nav items ────────────────────────────────────────────────── */
+.nav-drawer-items {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.nav-drawer-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1.5px solid transparent;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.9375rem;
+  font-weight: 400;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.2s, color 0.15s, box-shadow 0.2s;
+  width: 100%;
+  text-align: left;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.nav-drawer-item:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.nav-drawer-item--active {
+  border-color: rgba(0, 229, 204, 0.5);
+  background: rgba(0, 229, 204, 0.06);
+  color: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 0 16px rgba(0, 229, 204, 0.1);
+}
+
+.nav-drawer-item-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  color: inherit;
+  opacity: 0.7;
+}
+
+.nav-drawer-item--active .nav-drawer-item-icon {
+  color: #00e5cc;
+  opacity: 1;
+}
+
+/* ── Footer ───────────────────────────────────────────────────── */
+.nav-drawer-footer {
+  padding: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}

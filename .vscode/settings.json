@@ -1,1 +1,3 @@
-{}
+{
+  "mcp.serverRouting": "./ui_workflow/ui-pipeline/mcp/routing.yaml"
+}

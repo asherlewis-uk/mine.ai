@@ -1,0 +1,49 @@
+.circle-fab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.2s;
+  flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.circle-fab:active {
+  transform: scale(0.92);
+}
+
+.circle-fab--teal-core {
+  background: linear-gradient(135deg, #00e5cc, #00c4ad);
+  box-shadow: 0 0 20px rgba(0, 229, 204, 0.4), 0 0 6px rgba(0, 229, 204, 0.2);
+  color: #080808;
+}
+
+.circle-fab--teal-core:hover {
+  box-shadow: 0 0 28px rgba(0, 229, 204, 0.55), 0 0 10px rgba(0, 229, 204, 0.3);
+}
+
+.circle-fab--spectral-edge {
+  background: conic-gradient(
+    from 135deg,
+    rgba(0, 255, 127, 0.9),
+    rgba(0, 229, 204, 0.9),
+    rgba(255, 0, 255, 0.7),
+    rgba(255, 165, 0, 0.8),
+    rgba(0, 255, 127, 0.9)
+  );
+  box-shadow: 0 0 20px rgba(0, 229, 204, 0.3), 0 0 20px rgba(255, 0, 255, 0.15);
+  color: #080808;
+}
+
+.circle-fab--spectral-edge:hover {
+  box-shadow: 0 0 28px rgba(0, 229, 204, 0.45), 0 0 28px rgba(255, 0, 255, 0.2);
+}
+
+.circle-fab-icon {
+  width: 20px;
+  height: 20px;
+}
