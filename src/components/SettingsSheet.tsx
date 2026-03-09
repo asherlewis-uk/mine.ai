@@ -39,13 +39,36 @@ import {
   Image,
   Layers,
 } from "lucide-react";
-import { db, getSetting, setSetting, setThemeSettings, getAllSettings, toggleArchiveThread, deleteThread, getFlexibleSetting, setFlexibleSetting, debugAllSettings } from "@/lib/db";
+import {
+  db,
+  getSetting,
+  setSetting,
+  setThemeSettings,
+  getAllSettings,
+  toggleArchiveThread,
+  deleteThread,
+  getFlexibleSetting,
+  setFlexibleSetting,
+  debugAllSettings,
+} from "@/lib/db";
 import { fetchModels } from "@/lib/api";
 import { THEME_PRESETS, hexToHSL } from "./ThemeManager";
-import { AlertDialog, ConfirmDialog, PromptDialog, SelectDialog } from "./ConfirmDialog";
-
+import {
+  AlertDialog,
+  ConfirmDialog,
+  PromptDialog,
+  SelectDialog,
+} from "./ConfirmDialog";
 // ─── Types ───────────────────────────────────────────────────────
-type Screen = "root" | "security" | "data" | "about" | "ai" | "appearance" | "archived" | "identity";
+type Screen =
+  | "root"
+  | "security"
+  | "data"
+  | "about"
+  | "ai"
+  | "appearance"
+  | "archived"
+  | "identity";
 type ModelType = "default" | string;
 type BubbleStyle = "default" | "modern" | "compact";
 
@@ -100,7 +123,8 @@ async function exportUserData() {
 
     if (await isNativePlatform()) {
       // ── Native (Capacitor / iOS / Android) ──
-      const { Filesystem, Directory, Encoding } = await import("@capacitor/filesystem");
+      const { Filesystem, Directory, Encoding } =
+        await import("@capacitor/filesystem");
       const { Share } = await import("@capacitor/share");
 
       const writeResult = await Filesystem.writeFile({
@@ -276,7 +300,9 @@ function SubHeader({
       >
         <ChevronLeft className="h-5 w-5" />
       </button>
-      <h2 className="text-[17px] font-semibold text-zinc-900 dark:text-zinc-100">{title}</h2>
+      <h2 className="text-[17px] font-semibold text-zinc-900 dark:text-zinc-100">
+        {title}
+      </h2>
       {rightAction && <div className="absolute right-3">{rightAction}</div>}
     </div>
   );
@@ -296,8 +322,13 @@ function AISettingsScreen({ onBack }: { onBack: () => void }) {
   const [localThinking, setLocalThinking] = useState(true);
   const [availableModels, setAvailableModels] = useState<string[]>([]);
   const [isFetchingModels, setIsFetchingModels] = useState(false);
-  const [connectionStatus, setConnectionStatus] = useState<"idle" | "testing" | "success" | "error">("idle");
-  const [alertInfo, setAlertInfo] = useState<{ title: string; message: string } | null>(null);
+  const [connectionStatus, setConnectionStatus] = useState<
+    "idle" | "testing" | "success" | "error"
+  >("idle");
+  const [alertInfo, setAlertInfo] = useState<{
+    title: string;
+    message: string;
+  } | null>(null);
   const hasInitializedRef = useRef(false);
 
   // Sync DB → local state only on initial load (not on every DB update)
@@ -347,7 +378,7 @@ function AISettingsScreen({ onBack }: { onBack: () => void }) {
       setIsFetchingModels(true);
       const result = await fetchModels(localApiUrl);
       setIsFetchingModels(false);
-      
+
       if (result.success && result.models.length > 0) {
         setAvailableModels(result.models);
       } else {
@@ -361,7 +392,10 @@ function AISettingsScreen({ onBack }: { onBack: () => void }) {
 
   const handleTestConnection = async () => {
     if (!localApiUrl) {
-      setAlertInfo({ title: "Missing URL", message: "Please enter an API URL first." });
+      setAlertInfo({
+        title: "Missing URL",
+        message: "Please enter an API URL first.",
+      });
       return;
     }
 
@@ -434,8 +468,8 @@ function AISettingsScreen({ onBack }: { onBack: () => void }) {
                 connectionStatus === "success"
                   ? "bg-green-600 text-white"
                   : connectionStatus === "error"
-                  ? "bg-red-600 text-white"
-                  : "bg-blue-600 text-white hover:bg-blue-700"
+                    ? "bg-red-600 text-white"
+                    : "bg-blue-600 text-white hover:bg-blue-700"
               }`}
             >
               {connectionStatus === "testing" && "Testing Connection..."}
@@ -448,7 +482,13 @@ function AISettingsScreen({ onBack }: { onBack: () => void }) {
 
         <Section
           title="Model Name"
-          footer={isFetchingModels ? "Fetching available models..." : availableModels.length > 0 ? `${availableModels.length} models available` : "Enter API URL to fetch models"}
+          footer={
+            isFetchingModels
+              ? "Fetching available models..."
+              : availableModels.length > 0
+                ? `${availableModels.length} models available`
+                : "Enter API URL to fetch models"
+          }
         >
           <div className="px-4 py-3">
             {availableModels.length > 0 ? (
@@ -476,7 +516,10 @@ function AISettingsScreen({ onBack }: { onBack: () => void }) {
           </div>
         </Section>
 
-        <Section title="Temperature" footer={`Current: ${localTemperature}. Higher = more creative, lower = more focused.`}>
+        <Section
+          title="Temperature"
+          footer={`Current: ${localTemperature}. Higher = more creative, lower = more focused.`}
+        >
           <div className="px-4 py-3">
             <input
               type="range"
@@ -490,7 +533,10 @@ function AISettingsScreen({ onBack }: { onBack: () => void }) {
           </div>
         </Section>
 
-        <Section title="Top P (Nucleus Sampling)" footer={`Current: ${localTopP}. Controls diversity via cumulative probability cutoff.`}>
+        <Section
+          title="Top P (Nucleus Sampling)"
+          footer={`Current: ${localTopP}. Controls diversity via cumulative probability cutoff.`}
+        >
           <div className="px-4 py-3">
             <input
               type="range"
@@ -504,7 +550,10 @@ function AISettingsScreen({ onBack }: { onBack: () => void }) {
           </div>
         </Section>
 
-        <Section title="Context Window" footer={`Tokens sent to model: ${localContextLength.toLocaleString()}. Higher values use more memory.`}>
+        <Section
+          title="Context Window"
+          footer={`Tokens sent to model: ${localContextLength.toLocaleString()}. Higher values use more memory.`}
+        >
           <div className="px-4 py-3">
             <select
               value={localContextLength}
@@ -522,7 +571,10 @@ function AISettingsScreen({ onBack }: { onBack: () => void }) {
           </div>
         </Section>
 
-        <Section title="Features" footer="When enabled, shows the AI's reasoning process before each response.">
+        <Section
+          title="Features"
+          footer="When enabled, shows the AI's reasoning process before each response."
+        >
           <Row
             icon={<Brain className="h-5 w-5" />}
             label="Show thinking process"
@@ -553,7 +605,10 @@ function SecurityScreen({ onBack }: { onBack: () => void }) {
   const autoLockTimeout = useLiveQuery(() => getSetting("auto_lock_timeout"));
 
   // Themed dialog state
-  const [alertInfo, setAlertInfo] = useState<{ title: string; message: string } | null>(null);
+  const [alertInfo, setAlertInfo] = useState<{
+    title: string;
+    message: string;
+  } | null>(null);
   const [autoLockOpen, setAutoLockOpen] = useState(false);
 
   const handleBiometricToggle = async (value: boolean) => {
@@ -561,10 +616,10 @@ function SecurityScreen({ onBack }: { onBack: () => void }) {
       // Attempt actual biometric enrollment
       try {
         const { NativeBiometric } = await import("capacitor-native-biometric");
-        
+
         // Check if biometrics are available on this device
         const result = await NativeBiometric.isAvailable();
-        
+
         if (result.isAvailable) {
           // Trigger biometric authentication challenge
           await NativeBiometric.verifyIdentity({
@@ -573,28 +628,51 @@ function SecurityScreen({ onBack }: { onBack: () => void }) {
             subtitle: "Verify your identity",
             description: "Use Face ID or Touch ID to secure mine.ai",
           });
-          
+
           // If we get here, authentication succeeded
           await setSetting("security_biometric", true);
         } else {
-          setAlertInfo({ title: "Biometrics Unavailable", message: "Biometric authentication is not available on this device. Please set up Face ID or Touch ID in your device settings." });
+          setAlertInfo({
+            title: "Biometrics Unavailable",
+            message:
+              "Biometric authentication is not available on this device. Please set up Face ID or Touch ID in your device settings.",
+          });
         }
       } catch (err: any) {
         // Check if Capacitor plugin is not available (web environment)
-        if (err?.message?.includes?.("not implemented") || err?.code === "UNIMPLEMENTED" || err?.name === "TypeError") {
+        if (
+          err?.message?.includes?.("not implemented") ||
+          err?.code === "UNIMPLEMENTED" ||
+          err?.name === "TypeError"
+        ) {
           // Web fallback — no native biometrics available
-          const supportsWebAuthn = typeof window !== "undefined" && window.PublicKeyCredential;
+          const supportsWebAuthn =
+            typeof window !== "undefined" && window.PublicKeyCredential;
           if (supportsWebAuthn) {
-            setAlertInfo({ title: "Biometric Lock", message: "Biometric lock requires a native app build (iOS/Android).\n\nWeb Authentication (WebAuthn) is available but biometric lock works best in the native app." });
+            setAlertInfo({
+              title: "Biometric Lock",
+              message:
+                "Biometric lock requires a native app build (iOS/Android).\n\nWeb Authentication (WebAuthn) is available but biometric lock works best in the native app.",
+            });
           } else {
-            setAlertInfo({ title: "Biometric Lock", message: "Biometric authentication is not available in the browser.\n\nPlease use the native iOS or Android app for biometric lock support." });
+            setAlertInfo({
+              title: "Biometric Lock",
+              message:
+                "Biometric authentication is not available in the browser.\n\nPlease use the native iOS or Android app for biometric lock support.",
+            });
           }
-        } else if (err?.code === "AUTH_FAILED" || err?.message?.includes?.("cancel")) {
+        } else if (
+          err?.code === "AUTH_FAILED" ||
+          err?.message?.includes?.("cancel")
+        ) {
           // User cancelled or authentication failed
           console.log("Biometric enrollment cancelled by user");
         } else {
           console.error("Biometric error:", err);
-          setAlertInfo({ title: "Authentication Failed", message: "Biometric authentication failed. Please try again." });
+          setAlertInfo({
+            title: "Authentication Failed",
+            message: "Biometric authentication failed. Please try again.",
+          });
         }
       }
     } else {
@@ -602,7 +680,7 @@ function SecurityScreen({ onBack }: { onBack: () => void }) {
       try {
         const { NativeBiometric } = await import("capacitor-native-biometric");
         const result = await NativeBiometric.isAvailable();
-        
+
         if (result.isAvailable) {
           await NativeBiometric.verifyIdentity({
             reason: "Authenticate to disable biometric lock",
@@ -620,7 +698,11 @@ function SecurityScreen({ onBack }: { onBack: () => void }) {
   const handleIncognitoToggle = async (value: boolean) => {
     await setSetting("incognito_active", value);
     if (value) {
-      setAlertInfo({ title: "Incognito Mode", message: "Incognito Mode enabled.\n\nYour conversations won't be saved to history until you disable this mode." });
+      setAlertInfo({
+        title: "Incognito Mode",
+        message:
+          "Incognito Mode enabled.\n\nYour conversations won't be saved to history until you disable this mode.",
+      });
     }
   };
 
@@ -628,15 +710,32 @@ function SecurityScreen({ onBack }: { onBack: () => void }) {
     setAutoLockOpen(true);
   };
 
-  const autoLockOptions = ["1 minute", "5 minutes", "15 minutes", "30 minutes", "Never"];
+  const autoLockOptions = [
+    "1 minute",
+    "5 minutes",
+    "15 minutes",
+    "30 minutes",
+    "Never",
+  ];
   const autoLockTimeoutMap: Record<string, number> = {
-    "1 minute": 1, "5 minutes": 5, "15 minutes": 15, "30 minutes": 30, "Never": 0,
+    "1 minute": 1,
+    "5 minutes": 5,
+    "15 minutes": 15,
+    "30 minutes": 30,
+    Never: 0,
   };
   const currentAutoLock = autoLockTimeout || 5;
-  const currentAutoLockLabel = currentAutoLock === 0 ? "Never" : `${currentAutoLock} minute${currentAutoLock > 1 ? "s" : ""}`;
+  const currentAutoLockLabel =
+    currentAutoLock === 0
+      ? "Never"
+      : `${currentAutoLock} minute${currentAutoLock > 1 ? "s" : ""}`;
 
   const handleChangePasscode = async () => {
-    setAlertInfo({ title: "Change Passcode", message: "In a production app, this would:\n1. Verify current passcode\n2. Prompt for new passcode\n3. Confirm new passcode\n4. Update secure storage" });
+    setAlertInfo({
+      title: "Change Passcode",
+      message:
+        "In a production app, this would:\n1. Verify current passcode\n2. Prompt for new passcode\n3. Confirm new passcode\n4. Update secure storage",
+    });
   };
 
   return (
@@ -713,7 +812,10 @@ function DataScreen({ onBack }: { onBack: () => void }) {
   const [isDeleting, setIsDeleting] = useState(false);
 
   // Themed dialog state
-  const [alertInfo, setAlertInfo] = useState<{ title: string; message: string } | null>(null);
+  const [alertInfo, setAlertInfo] = useState<{
+    title: string;
+    message: string;
+  } | null>(null);
   const [deleteAllConfirm, setDeleteAllConfirm] = useState(false);
   const [deleteAllPrompt, setDeleteAllPrompt] = useState(false);
   const [deleteHistoryConfirm, setDeleteHistoryConfirm] = useState(false);
@@ -727,11 +829,19 @@ function DataScreen({ onBack }: { onBack: () => void }) {
     setIsExporting(true);
     const success = await exportUserData();
     setIsExporting(false);
-    
+
     if (success) {
-      setAlertInfo({ title: "Export Successful", message: "Data exported successfully!\n\nCheck your downloads folder for the backup file." });
+      setAlertInfo({
+        title: "Export Successful",
+        message:
+          "Data exported successfully!\n\nCheck your downloads folder for the backup file.",
+      });
     } else {
-      setAlertInfo({ title: "Export Failed", message: "Export failed.\n\nPlease try again or check the console for errors." });
+      setAlertInfo({
+        title: "Export Failed",
+        message:
+          "Export failed.\n\nPlease try again or check the console for errors.",
+      });
     }
   };
 
@@ -756,11 +866,17 @@ function DataScreen({ onBack }: { onBack: () => void }) {
       await db.threads.clear();
       await db.messages.clear();
       await db.settings.clear();
-      setAlertInfo({ title: "Data Deleted", message: "All data deleted successfully. The app will now reload." });
+      setAlertInfo({
+        title: "Data Deleted",
+        message: "All data deleted successfully. The app will now reload.",
+      });
       setTimeout(() => window.location.reload(), 1500);
     } catch (error) {
       console.error("Delete failed:", error);
-      setAlertInfo({ title: "Delete Failed", message: "Failed to delete data. Please try again." });
+      setAlertInfo({
+        title: "Delete Failed",
+        message: "Failed to delete data. Please try again.",
+      });
       setIsDeleting(false);
     }
   };
@@ -774,11 +890,17 @@ function DataScreen({ onBack }: { onBack: () => void }) {
     try {
       await db.threads.clear();
       await db.messages.clear();
-      setAlertInfo({ title: "History Deleted", message: "Conversation history deleted successfully." });
+      setAlertInfo({
+        title: "History Deleted",
+        message: "Conversation history deleted successfully.",
+      });
       setTimeout(() => onBack(), 1000);
     } catch (error) {
       console.error("Delete history failed:", error);
-      setAlertInfo({ title: "Delete Failed", message: "Failed to delete history. Please try again." });
+      setAlertInfo({
+        title: "Delete Failed",
+        message: "Failed to delete history. Please try again.",
+      });
     }
   };
 
@@ -795,7 +917,8 @@ function DataScreen({ onBack }: { onBack: () => void }) {
           />
         </Section>
         <p className="mb-6 -mt-4 px-4 text-xs text-zinc-500 leading-relaxed">
-          Download a complete backup of your conversations, messages, and settings as a JSON file.
+          Download a complete backup of your conversations, messages, and
+          settings as a JSON file.
         </p>
 
         <Section title="Delete">
@@ -820,13 +943,17 @@ function DataScreen({ onBack }: { onBack: () => void }) {
         <Section title="Storage">
           <div className="px-4 py-3">
             <div className="flex justify-between items-center mb-2">
-              <span className="text-[14px] text-zinc-600 dark:text-zinc-400">Total conversations</span>
+              <span className="text-[14px] text-zinc-600 dark:text-zinc-400">
+                Total conversations
+              </span>
               <span className="text-[14px] text-zinc-800 dark:text-zinc-300">
                 {threadCount}
               </span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-[14px] text-zinc-600 dark:text-zinc-400">Total messages</span>
+              <span className="text-[14px] text-zinc-600 dark:text-zinc-400">
+                Total messages
+              </span>
               <span className="text-[14px] text-zinc-800 dark:text-zinc-300">
                 {messageCount}
               </span>
@@ -845,7 +972,9 @@ function DataScreen({ onBack }: { onBack: () => void }) {
       <ConfirmDialog
         isOpen={deleteAllConfirm}
         title="Delete All Data"
-        message={"This will permanently delete:\n• All conversations\n• All messages\n• All settings\n\nThis action cannot be undone!"}
+        message={
+          "This will permanently delete:\n• All conversations\n• All messages\n• All settings\n\nThis action cannot be undone!"
+        }
         confirmLabel="Continue"
         destructive
         onConfirm={handleConfirmDeleteAll}
@@ -874,31 +1003,49 @@ function DataScreen({ onBack }: { onBack: () => void }) {
 }
 
 function AboutScreen({ onBack }: { onBack: () => void }) {
-  const [alertInfo, setAlertInfo] = useState<{ title: string; message: string } | null>(null);
+  const [alertInfo, setAlertInfo] = useState<{
+    title: string;
+    message: string;
+  } | null>(null);
 
   const handleReportBug = () => {
     const subject = encodeURIComponent("mine.ai Bug Report");
     const body = encodeURIComponent(
       "Please describe the bug you encountered:\n\n" +
-      "Steps to reproduce:\n1. \n2. \n3. \n\n" +
-      "Expected behavior:\n\n" +
-      "Actual behavior:\n\n" +
-      `App Version: 1.0.0\n` +
-      `Browser: ${navigator.userAgent}`
+        "Steps to reproduce:\n1. \n2. \n3. \n\n" +
+        "Expected behavior:\n\n" +
+        "Actual behavior:\n\n" +
+        `App Version: 1.0.0\n` +
+        `Browser: ${navigator.userAgent}`,
     );
-    window.open(`mailto:support@mine-ai.app?subject=${subject}&body=${body}`, "_blank");
+    window.open(
+      `mailto:support@mine-ai.app?subject=${subject}&body=${body}`,
+      "_blank",
+    );
   };
 
   const handleHelpCenter = () => {
-    setAlertInfo({ title: "Help Center", message: "Opening help documentation...\n\nIn a production app, this would link to:\nhttps://help.mine-ai.app" });
+    setAlertInfo({
+      title: "Help Center",
+      message:
+        "Opening help documentation...\n\nIn a production app, this would link to:\nhttps://help.mine-ai.app",
+    });
   };
 
   const handleTermsOfUse = () => {
-    setAlertInfo({ title: "Terms of Use", message: "Opening terms of service...\n\nIn a production app, this would link to:\nhttps://mine-ai.app/terms" });
+    setAlertInfo({
+      title: "Terms of Use",
+      message:
+        "Opening terms of service...\n\nIn a production app, this would link to:\nhttps://mine-ai.app/terms",
+    });
   };
 
   const handlePrivacyPolicy = () => {
-    setAlertInfo({ title: "Privacy Policy", message: "Opening privacy policy...\n\nIn a production app, this would link to:\nhttps://mine-ai.app/privacy" });
+    setAlertInfo({
+      title: "Privacy Policy",
+      message:
+        "Opening privacy policy...\n\nIn a production app, this would link to:\nhttps://mine-ai.app/privacy",
+    });
   };
 
   return (
@@ -906,7 +1053,11 @@ function AboutScreen({ onBack }: { onBack: () => void }) {
       <SubHeader title="About" onBack={onBack} />
       <div className="flex-1 overflow-y-auto px-4 pt-4 pb-8">
         <Section title="Support & Legal">
-          <Row icon={<Bug className="h-5 w-5" />} label="Report bug" onClick={handleReportBug} />
+          <Row
+            icon={<Bug className="h-5 w-5" />}
+            label="Report bug"
+            onClick={handleReportBug}
+          />
           <Row
             icon={<HelpCircle className="h-5 w-5" />}
             label="Help Center"
@@ -927,7 +1078,9 @@ function AboutScreen({ onBack }: { onBack: () => void }) {
               <span className="h-4 w-4 rounded-full bg-linear-to-br from-blue-600 to-indigo-600" />
             </span>
             <div className="flex flex-col">
-              <span className="text-[16px] text-zinc-900 dark:text-zinc-100">mine.ai</span>
+              <span className="text-[16px] text-zinc-900 dark:text-zinc-100">
+                mine.ai
+              </span>
               <span className="text-[13px] text-zinc-500">Version 1.0.0</span>
             </div>
           </div>
@@ -936,10 +1089,13 @@ function AboutScreen({ onBack }: { onBack: () => void }) {
         <Section title="About mine.ai">
           <div className="px-4 py-3">
             <p className="text-[14px] text-zinc-600 dark:text-zinc-400 leading-relaxed mb-3">
-              mine.ai is a privacy-first, local-first AI chat application. All your conversations are stored locally in your browser using IndexedDB.
+              mine.ai is a privacy-first, local-first AI chat application. All
+              your conversations are stored locally in your browser using
+              IndexedDB.
             </p>
             <p className="text-[14px] text-zinc-600 dark:text-zinc-400 leading-relaxed">
-              Built with Next.js, Dexie.js, and Tailwind CSS. Designed for users who value privacy and control over their data.
+              Built with Next.js, Dexie.js, and Tailwind CSS. Designed for users
+              who value privacy and control over their data.
             </p>
           </div>
         </Section>
@@ -958,7 +1114,9 @@ function AboutScreen({ onBack }: { onBack: () => void }) {
 function ArchivedScreen({ onBack }: { onBack: () => void }) {
   const archivedThreads = useLiveQuery(async () => {
     const threads = await db.threads.toArray();
-    return threads.filter(t => t.archived === true).sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+    return threads
+      .filter((t) => t.archived === true)
+      .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
   });
 
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
@@ -978,11 +1136,17 @@ function ArchivedScreen({ onBack }: { onBack: () => void }) {
         {!archivedThreads || archivedThreads.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <Archive className="h-12 w-12 text-zinc-700 mb-3" />
-            <p className="text-zinc-600 dark:text-zinc-400 text-[15px]">No archived conversations</p>
-            <p className="text-zinc-500 dark:text-zinc-600 text-[13px] mt-1">Archived chats will appear here</p>
+            <p className="text-zinc-600 dark:text-zinc-400 text-[15px]">
+              No archived conversations
+            </p>
+            <p className="text-zinc-500 dark:text-zinc-600 text-[13px] mt-1">
+              Archived chats will appear here
+            </p>
           </div>
         ) : (
-          <Section title={`${archivedThreads.length} Archived ${archivedThreads.length === 1 ? 'Chat' : 'Chats'}`}>
+          <Section
+            title={`${archivedThreads.length} Archived ${archivedThreads.length === 1 ? "Chat" : "Chats"}`}
+          >
             {archivedThreads.map((thread, index) => (
               <div
                 key={thread.id}
@@ -990,7 +1154,9 @@ function ArchivedScreen({ onBack }: { onBack: () => void }) {
               >
                 <MessageSquare className="h-5 w-5 text-zinc-500 shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-[16px] text-zinc-800 dark:text-zinc-300 truncate">{thread.title}</p>
+                  <p className="text-[16px] text-zinc-800 dark:text-zinc-300 truncate">
+                    {thread.title}
+                  </p>
                   <p className="text-[13px] text-zinc-500 dark:text-zinc-600">
                     {new Date(thread.updatedAt).toLocaleDateString()}
                   </p>
@@ -1141,9 +1307,11 @@ function IdentityScreen({ onBack }: { onBack: () => void }) {
           <div className="px-4 py-3">
             <p className="text-[14px] text-zinc-600 dark:text-zinc-400 leading-relaxed">
               Your profile is injected into the AI system prompt as a{" "}
-              <span className="text-zinc-800 dark:text-zinc-300 font-medium">[USER PROFILE]</span>{" "}
-              block, giving the model context about you without sharing raw
-              data externally.
+              <span className="text-zinc-800 dark:text-zinc-300 font-medium">
+                [USER PROFILE]
+              </span>{" "}
+              block, giving the model context about you without sharing raw data
+              externally.
             </p>
           </div>
         </Section>
@@ -1157,12 +1325,19 @@ function AppearanceScreen({ onBack }: { onBack: () => void }) {
   const appearance = useLiveQuery(() => getSetting("appearance"));
   const textSize = useLiveQuery(() => getSetting("font_size_modifier"));
   const bubbleStyle = useLiveQuery(() => getSetting("bubble_style"));
-  const wallpaperUrl = useLiveQuery(() => getFlexibleSetting("wallpaper_url", ""));
+  const wallpaperUrl = useLiveQuery(() =>
+    getFlexibleSetting("wallpaper_url", ""),
+  );
   const glassMode = useLiveQuery(() => getFlexibleSetting("glass_mode", false));
-  const themePreset = useLiveQuery(() => getFlexibleSetting("theme_preset", "default"));
+  const themePreset = useLiveQuery(() =>
+    getFlexibleSetting("theme_preset", "default"),
+  );
 
   const [localWallpaper, setLocalWallpaper] = useState("");
-  const [alertInfo, setAlertInfo] = useState<{ title: string; message: string } | null>(null);
+  const [alertInfo, setAlertInfo] = useState<{
+    title: string;
+    message: string;
+  } | null>(null);
   const wallpaperFileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -1179,13 +1354,18 @@ function AppearanceScreen({ onBack }: { onBack: () => void }) {
     await setSetting("accent_color", preset.accent);
   };
 
-  const handleWallpaperFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleWallpaperFileSelect = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     // Validate it's an image
     if (!file.type.startsWith("image/")) {
-      setAlertInfo({ title: "Invalid File", message: "Please select an image file." });
+      setAlertInfo({
+        title: "Invalid File",
+        message: "Please select an image file.",
+      });
       return;
     }
 
@@ -1213,7 +1393,9 @@ function AppearanceScreen({ onBack }: { onBack: () => void }) {
     await setFlexibleSetting("glass_mode", value);
   };
 
-  const handleBubbleStyleChange = async (style: "default" | "modern" | "compact") => {
+  const handleBubbleStyleChange = async (
+    style: "default" | "modern" | "compact",
+  ) => {
     await setSetting("bubble_style", style);
   };
 
@@ -1237,7 +1419,8 @@ function AppearanceScreen({ onBack }: { onBack: () => void }) {
   useEffect(() => {
     if (textSize) {
       const sizeMap = { small: "14px", medium: "16px", large: "18px" };
-      document.documentElement.style.fontSize = sizeMap[textSize as keyof typeof sizeMap] || "16px";
+      document.documentElement.style.fontSize =
+        sizeMap[textSize as keyof typeof sizeMap] || "16px";
     }
   }, [textSize]);
 
@@ -1252,7 +1435,6 @@ function AppearanceScreen({ onBack }: { onBack: () => void }) {
     <div className="flex h-full flex-col">
       <SubHeader title="Appearance" onBack={onBack} />
       <div className="flex-1 overflow-y-auto px-4 pt-4 pb-8">
-
         {/* ── Theme Mode ─── Segmented control instead of dropdown ── */}
         <Section title="Theme">
           <div className="px-4 py-3">
@@ -1276,7 +1458,10 @@ function AppearanceScreen({ onBack }: { onBack: () => void }) {
         </Section>
 
         {/* ── Theme Presets ── Larger swatches, 3-col grid ── */}
-        <Section title="Color Theme" footer="Sets the overall color palette and accent.">
+        <Section
+          title="Color Theme"
+          footer="Sets the overall color palette and accent."
+        >
           <div className="px-4 py-4">
             <div className="grid grid-cols-3 gap-3">
               {THEME_PRESETS.map((preset) => (
@@ -1316,7 +1501,10 @@ function AppearanceScreen({ onBack }: { onBack: () => void }) {
         </Section>
 
         {/* ── Accent Color Override ── Collapsed into a row that expands ── */}
-        <Section title="Accent Color" footer="Override the accent from the color theme above.">
+        <Section
+          title="Accent Color"
+          footer="Override the accent from the color theme above."
+        >
           <div className="px-4 py-4">
             <div className="flex items-center justify-center gap-3 flex-wrap">
               {ACCENT_COLORS.map((color) => (
@@ -1345,7 +1533,10 @@ function AppearanceScreen({ onBack }: { onBack: () => void }) {
         </Section>
 
         {/* ── Wallpaper & Glass Mode ── Grouped together ── */}
-        <Section title="Background" footer="Wallpapers work best with Glass Mode enabled.">
+        <Section
+          title="Background"
+          footer="Wallpapers work best with Glass Mode enabled."
+        >
           <div className="px-4 py-3">
             <input
               ref={wallpaperFileRef}
@@ -1396,7 +1587,9 @@ function AppearanceScreen({ onBack }: { onBack: () => void }) {
         <Section title="Text & Layout">
           {/* Text Size — segmented control */}
           <div className="px-4 py-3 border-b border-zinc-800/60">
-            <label className="text-[13px] text-zinc-500 mb-2 block">Text Size</label>
+            <label className="text-[13px] text-zinc-500 mb-2 block">
+              Text Size
+            </label>
             <div className="flex rounded-lg bg-zinc-800 p-1">
               {TEXT_SIZES.map((size) => (
                 <button
@@ -1411,7 +1604,11 @@ function AppearanceScreen({ onBack }: { onBack: () => void }) {
                 >
                   <span
                     className={`font-medium ${
-                      size.id === "small" ? "text-[12px]" : size.id === "medium" ? "text-[14px]" : "text-[16px]"
+                      size.id === "small"
+                        ? "text-[12px]"
+                        : size.id === "medium"
+                          ? "text-[14px]"
+                          : "text-[16px]"
                     }`}
                   >
                     {size.label}
@@ -1422,7 +1619,9 @@ function AppearanceScreen({ onBack }: { onBack: () => void }) {
           </div>
           {/* Bubble Style — segmented control */}
           <div className="px-4 py-3">
-            <label className="text-[13px] text-zinc-500 mb-2 block">Bubble Style</label>
+            <label className="text-[13px] text-zinc-500 mb-2 block">
+              Bubble Style
+            </label>
             <div className="flex rounded-lg bg-zinc-800 p-1">
               {BUBBLE_STYLE_OPTIONS.map((style) => (
                 <button
@@ -1441,7 +1640,6 @@ function AppearanceScreen({ onBack }: { onBack: () => void }) {
             </div>
           </div>
         </Section>
-
       </div>
 
       <AlertDialog
@@ -1471,14 +1669,19 @@ export function SettingsSheet({
   const [availableModels, setAvailableModels] = useState<string[]>([]);
 
   // Dialog state for root screen
-  const [alertInfo, setAlertInfo] = useState<{ title: string; message: string } | null>(null);
+  const [alertInfo, setAlertInfo] = useState<{
+    title: string;
+    message: string;
+  } | null>(null);
   const [languageOpen, setLanguageOpen] = useState(false);
   const [clearAllConfirm, setClearAllConfirm] = useState(false);
 
   // Load settings from DB (only for root screen toggles)
   const hapticEnabled = useLiveQuery(() => getSetting("haptic_enabled"));
   const spellingEnabled = useLiveQuery(() => getSetting("spelling_enabled"));
-  const notificationsEnabled = useLiveQuery(() => getSetting("notifications_enabled"));
+  const notificationsEnabled = useLiveQuery(() =>
+    getSetting("notifications_enabled"),
+  );
   const accentColor = useLiveQuery(() => getSetting("accent_color"));
   const apiUrl = useLiveQuery(() => getSetting("apiUrl"));
   const subscriptionTier = useLiveQuery(() => getSetting("subscription_tier"));
@@ -1511,18 +1714,32 @@ export function SettingsSheet({
   };
 
   const handleSubscriptionClick = () => {
-    setAlertInfo({ title: "Current Plan", message: `Current Plan: ${subscriptionTier || "Free Plan"}\n\nIn a production app, this would show:\n• Current plan details\n• Usage statistics\n• Billing history\n• Plan management options` });
+    setAlertInfo({
+      title: "Current Plan",
+      message: `Current Plan: ${subscriptionTier || "Free Plan"}\n\nIn a production app, this would show:\n• Current plan details\n• Usage statistics\n• Billing history\n• Plan management options`,
+    });
   };
 
   const handleUpgradeToPro = () => {
-    setAlertInfo({ title: "Upgrade to Pro", message: "Pro Features:\n• Unlimited conversations\n• Priority model access\n• Advanced customization\n• Priority support\n\nIn a production app, this would open the subscription flow." });
+    setAlertInfo({
+      title: "Upgrade to Pro",
+      message:
+        "Pro Features:\n• Unlimited conversations\n• Priority model access\n• Advanced customization\n• Priority support\n\nIn a production app, this would open the subscription flow.",
+    });
   };
 
   const handleLanguageClick = async () => {
     setLanguageOpen(true);
   };
 
-  const languages = ["English", "Spanish", "French", "German", "Japanese", "Chinese"];
+  const languages = [
+    "English",
+    "Spanish",
+    "French",
+    "German",
+    "Japanese",
+    "Chinese",
+  ];
 
   // Reset to root when closing, or set to defaultScreen when opening
   useEffect(() => {
@@ -1558,14 +1775,27 @@ export function SettingsSheet({
       />
 
       {/* modal container */}
-      <div className="relative z-10 flex h-[92dvh] w-full max-w-md flex-col overflow-hidden rounded-t-3xl bg-white dark:bg-zinc-950 sm:h-[85vh] sm:rounded-3xl" data-glass-modal>
-        {screen === "ai" && <AISettingsScreen onBack={() => setScreen("root")} />}
-        {screen === "security" && <SecurityScreen onBack={() => setScreen("root")} />}
+      <div
+        className="relative z-10 flex h-[92dvh] w-full max-w-md flex-col overflow-hidden rounded-t-3xl bg-white dark:bg-zinc-950 sm:h-[85vh] sm:rounded-3xl"
+        data-glass-modal
+      >
+        {screen === "ai" && (
+          <AISettingsScreen onBack={() => setScreen("root")} />
+        )}
+        {screen === "security" && (
+          <SecurityScreen onBack={() => setScreen("root")} />
+        )}
         {screen === "data" && <DataScreen onBack={() => setScreen("root")} />}
         {screen === "about" && <AboutScreen onBack={() => setScreen("root")} />}
-        {screen === "archived" && <ArchivedScreen onBack={() => setScreen("root")} />}
-        {screen === "appearance" && <AppearanceScreen onBack={() => setScreen("root")} />}
-        {screen === "identity" && <IdentityScreen onBack={() => setScreen("root")} />}
+        {screen === "archived" && (
+          <ArchivedScreen onBack={() => setScreen("root")} />
+        )}
+        {screen === "appearance" && (
+          <AppearanceScreen onBack={() => setScreen("root")} />
+        )}
+        {screen === "identity" && (
+          <IdentityScreen onBack={() => setScreen("root")} />
+        )}
 
         {screen === "root" && (
           <>
@@ -1727,7 +1957,10 @@ export function SettingsSheet({
           setClearAllConfirm(false);
           await db.threads.clear();
           await db.messages.clear();
-          setAlertInfo({ title: "Data Cleared", message: "All conversations cleared." });
+          setAlertInfo({
+            title: "Data Cleared",
+            message: "All conversations cleared.",
+          });
           setTimeout(() => onClose(), 1000);
         }}
         onCancel={() => setClearAllConfirm(false)}

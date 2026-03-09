@@ -1,8 +1,25 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useLiveQuery } from "dexie-react-hooks";
-import { X, Sparkles, Plus, Settings, User, Trash2, Pencil, MessageSquare, Users } from "lucide-react";
+import {
+  X,
+  Sparkles,
+  Plus,
+  Settings,
+  User,
+  Trash2,
+  Pencil,
+  MessageSquare,
+  Users,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
-import { db, createThread, deleteThread, updateThreadTitle, toggleArchiveThread, type Character } from "@/lib/db";
+import {
+  db,
+  createThread,
+  deleteThread,
+  updateThreadTitle,
+  toggleArchiveThread,
+  type Character,
+} from "@/lib/db";
 import { ThreadItem } from "./ThreadItem";
 import { CharacterSidebarTab } from "./Character/CharacterSidebarTab";
 import { ConfirmDialog, PromptDialog } from "./ConfirmDialog";
@@ -33,8 +50,13 @@ export function Sidebar({
 }: SidebarProps) {
   const [activeTab, setActiveTab] = useState<SidebarTab>("chats");
   const [openSwipeId, setOpenSwipeId] = useState<string | null>(null);
-  const [deleteConfirm, setDeleteConfirm] = useState<{ threadId: string } | null>(null);
-  const [renamePrompt, setRenamePrompt] = useState<{ threadId: string; currentTitle: string } | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    threadId: string;
+  } | null>(null);
+  const [renamePrompt, setRenamePrompt] = useState<{
+    threadId: string;
+    currentTitle: string;
+  } | null>(null);
 
   const handleSwipeOpen = useCallback((threadId: string) => {
     setOpenSwipeId(threadId);
@@ -46,7 +68,7 @@ export function Sidebar({
 
   const threads = useLiveQuery(
     () => db.threads.orderBy("updatedAt").reverse().toArray(),
-    []
+    [],
   );
   const userProfile = useLiveQuery(async () => {
     const s = await db.settings.get("user_profile");
@@ -84,7 +106,7 @@ export function Sidebar({
     await toggleArchiveThread(threadId);
     if (activeThreadId === threadId) {
       const remaining = await db.threads
-        .filter(t => !t.archived && t.id !== threadId)
+        .filter((t) => !t.archived && t.id !== threadId)
         .reverse()
         .sortBy("updatedAt");
       if (remaining.length > 0) {
@@ -96,7 +118,11 @@ export function Sidebar({
     }
   };
 
-  const handleRenameThread = async (threadId: string, currentTitle: string, e: React.MouseEvent) => {
+  const handleRenameThread = async (
+    threadId: string,
+    currentTitle: string,
+    e: React.MouseEvent,
+  ) => {
     e.stopPropagation();
     setRenamePrompt({ threadId, currentTitle });
   };
@@ -187,7 +213,7 @@ export function Sidebar({
                 "flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-xs font-medium transition-colors",
                 activeTab === "chats"
                   ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-sm"
-                  : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
+                  : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white",
               )}
             >
               <MessageSquare size={14} />
@@ -199,7 +225,7 @@ export function Sidebar({
                 "flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-xs font-medium transition-colors",
                 activeTab === "characters"
                   ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-sm"
-                  : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
+                  : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white",
               )}
             >
               <Users size={14} />
@@ -211,13 +237,16 @@ export function Sidebar({
         {/* Content Area */}
         {/* Tap anywhere in the list background to close any open swipe row */}
         {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
-        <div className="flex-1 overflow-hidden" onPointerDown={(e) => {
-          // Reset open swipe row when tapping anywhere in the scroll area,
-          // including padding/gap between children (not just the exact container).
-          if (openSwipeId) {
-            handleCloseAllSwipes();
-          }
-        }}>
+        <div
+          className="flex-1 overflow-hidden"
+          onPointerDown={(e) => {
+            // Reset open swipe row when tapping anywhere in the scroll area,
+            // including padding/gap between children (not just the exact container).
+            if (openSwipeId) {
+              handleCloseAllSwipes();
+            }
+          }}
+        >
           {activeTab === "chats" ? (
             <div className="h-full overflow-y-auto px-2 pb-2">
               <div className="px-2 py-2">
@@ -226,23 +255,25 @@ export function Sidebar({
                 </span>
               </div>
               <div className="flex flex-col gap-0.5">
-                {threads?.filter(t => !t.archived).map((thread) => (
-                  <ThreadItem
-                    key={thread.id}
-                    thread={thread}
-                    isActive={thread.id === activeThreadId}
-                    openSwipeId={openSwipeId}
-                    onSwipeOpen={handleSwipeOpen}
-                    onSwipeClose={handleCloseAllSwipes}
-                    onClick={() => {
-                      handleCloseAllSwipes();
-                      onSelectThread(thread.id);
-                      onClose();
-                    }}
-                    onArchive={handleArchiveThread}
-                    onDelete={(id) => handleDeleteThread(id)}
-                  />
-                ))}
+                {threads
+                  ?.filter((t) => !t.archived)
+                  .map((thread) => (
+                    <ThreadItem
+                      key={thread.id}
+                      thread={thread}
+                      isActive={thread.id === activeThreadId}
+                      openSwipeId={openSwipeId}
+                      onSwipeOpen={handleSwipeOpen}
+                      onSwipeClose={handleCloseAllSwipes}
+                      onClick={() => {
+                        handleCloseAllSwipes();
+                        onSelectThread(thread.id);
+                        onClose();
+                      }}
+                      onArchive={handleArchiveThread}
+                      onDelete={(id) => handleDeleteThread(id)}
+                    />
+                  ))}
               </div>
             </div>
           ) : (
@@ -261,7 +292,10 @@ export function Sidebar({
           <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={() => { onClose(); setTimeout(() => onOpenIdentity?.(), 300); }}
+              onClick={() => {
+                onClose();
+                setTimeout(() => onOpenIdentity?.(), 300);
+              }}
               className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer hover:opacity-80 transition-opacity"
             >
               <div className="w-8 h-8 rounded-full bg-linear-to-br from-blue-600 to-indigo-600 flex items-center justify-center shrink-0">
@@ -271,7 +305,9 @@ export function Sidebar({
                 <p className="text-[13px] font-medium text-zinc-900 dark:text-zinc-100 truncate tracking-tight">
                   {userProfile?.displayName || "mine.ai User"}
                 </p>
-                <p className="text-[10px] text-zinc-500">{userProfile?.role || "Privacy First"}</p>
+                <p className="text-[10px] text-zinc-500">
+                  {userProfile?.role || "Privacy First"}
+                </p>
               </div>
             </button>
             <motion.button

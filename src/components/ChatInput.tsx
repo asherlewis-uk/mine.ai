@@ -1,4 +1,10 @@
-import { useState, useRef, useEffect, type FormEvent, type KeyboardEvent } from "react";
+import {
+  useState,
+  useRef,
+  useEffect,
+  type FormEvent,
+  type KeyboardEvent,
+} from "react";
 import { motion } from "framer-motion";
 import { Send, Paperclip, Mic, X, Square } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -52,17 +58,24 @@ interface SpeechRecognitionInstance {
   stop: () => void;
 }
 
-export function ChatInput({ value, onChange, onSubmit, isTyping, onStop, onKeyboardOffset }: ChatInputProps) {
+export function ChatInput({
+  value,
+  onChange,
+  onSubmit,
+  isTyping,
+  onStop,
+  onKeyboardOffset,
+}: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const valueRef = useRef(value);
-  
+
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isListening, setIsListening] = useState(false);
   const [keyboardOffset, setKeyboardOffset] = useState(0);
   const [speechAlert, setSpeechAlert] = useState(false);
-  
+
   const MAX_ROWS = 4;
   const LINE_HEIGHT = 20;
   const MAX_HEIGHT = LINE_HEIGHT * MAX_ROWS;
@@ -74,20 +87,29 @@ export function ChatInput({ value, onChange, onSubmit, isTyping, onStop, onKeybo
     const setupKeyboardListeners = async () => {
       try {
         const { Keyboard } = await import("@capacitor/keyboard");
-        
-        const showHandle = Keyboard.addListener("keyboardWillShow", (info: { keyboardHeight: number }) => {
-          setKeyboardOffset(info.keyboardHeight);
-          onKeyboardOffset?.(info.keyboardHeight);
-        });
-        
+
+        const showHandle = Keyboard.addListener(
+          "keyboardWillShow",
+          (info: { keyboardHeight: number }) => {
+            setKeyboardOffset(info.keyboardHeight);
+            onKeyboardOffset?.(info.keyboardHeight);
+          },
+        );
+
         const hideHandle = Keyboard.addListener("keyboardWillHide", () => {
           setKeyboardOffset(0);
           onKeyboardOffset?.(0);
         });
 
         cleanupFns.push(
-          () => showHandle.then((h: { remove: () => void }) => h.remove()).catch(() => {}),
-          () => hideHandle.then((h: { remove: () => void }) => h.remove()).catch(() => {})
+          () =>
+            showHandle
+              .then((h: { remove: () => void }) => h.remove())
+              .catch(() => {}),
+          () =>
+            hideHandle
+              .then((h: { remove: () => void }) => h.remove())
+              .catch(() => {}),
         );
       } catch {
         // Capacitor Keyboard not available (web fallback)
@@ -107,7 +129,7 @@ export function ChatInput({ value, onChange, onSubmit, isTyping, onStop, onKeybo
     };
 
     setupKeyboardListeners();
-    return () => cleanupFns.forEach(fn => fn());
+    return () => cleanupFns.forEach((fn) => fn());
   }, []);
 
   // Keep valueRef in sync with prop
@@ -118,7 +140,8 @@ export function ChatInput({ value, onChange, onSubmit, isTyping, onStop, onKeybo
   // Initialize Speech Recognition
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const SpeechRecognition =
+        window.SpeechRecognition || window.webkitSpeechRecognition;
       if (SpeechRecognition) {
         const recognition = new SpeechRecognition();
         recognition.continuous = true;
@@ -216,7 +239,11 @@ export function ChatInput({ value, onChange, onSubmit, isTyping, onStop, onKeybo
     <div
       className="fixed bottom-0 left-0 right-0 z-30 bg-black/60 backdrop-blur-xl border-t border-zinc-800/40 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]"
       data-glass-surface
-      style={keyboardOffset > 0 ? { bottom: `${keyboardOffset}px`, paddingBottom: '0.75rem' } : undefined}
+      style={
+        keyboardOffset > 0
+          ? { bottom: `${keyboardOffset}px`, paddingBottom: "0.75rem" }
+          : undefined
+      }
     >
       {/* File Pill */}
       {selectedFile && (
@@ -283,7 +310,7 @@ export function ChatInput({ value, onChange, onSubmit, isTyping, onStop, onKeybo
             "p-1.5 rounded-lg transition-colors shrink-0 mb-0.5",
             isListening
               ? "text-red-500 hover:text-red-400"
-              : "text-zinc-500 hover:text-zinc-200"
+              : "text-zinc-500 hover:text-zinc-200",
           )}
           animate={isListening ? { scale: [1, 1.1, 1] } : {}}
           transition={{ repeat: isListening ? Infinity : 0, duration: 1.5 }}
@@ -314,7 +341,11 @@ export function ChatInput({ value, onChange, onSubmit, isTyping, onStop, onKeybo
                 ? "text-zinc-100 hover:opacity-90 shadow-lg shadow-blue-600/20"
                 : "bg-zinc-800 text-zinc-600",
             )}
-            style={(value.trim() || selectedFile) && !isTyping ? { background: "var(--accent-color)" } : {}}
+            style={
+              (value.trim() || selectedFile) && !isTyping
+                ? { background: "var(--accent-color)" }
+                : {}
+            }
             aria-label="Send message"
           >
             <Send size={15} />

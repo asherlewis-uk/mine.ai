@@ -1,7 +1,12 @@
 import { motion } from "framer-motion";
 import { Menu, Sparkles, Sliders, Trash2, User } from "lucide-react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { getSetting, setSetting, getAllSettings, type Character } from "@/lib/db";
+import {
+  getSetting,
+  setSetting,
+  getAllSettings,
+  type Character,
+} from "@/lib/db";
 import { fetchModels } from "@/lib/api";
 import { useState, useEffect } from "react";
 
@@ -22,7 +27,7 @@ export function ChatHeader({
   activeCharacter,
   onAvatarClick,
 }: ChatHeaderProps) {
-  const modelName = useLiveQuery(() => getSetting('modelName'));
+  const modelName = useLiveQuery(() => getSetting("modelName"));
   const [availableModels, setAvailableModels] = useState<string[]>([]);
   const [lastFetchedUrl, setLastFetchedUrl] = useState<string | null>(null);
 
@@ -41,16 +46,21 @@ export function ChatHeader({
       }
     };
     loadModels();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [modelName]); // Re-fetch when model changes (implies possible URL change)
 
   const handleModelChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newModel = e.target.value;
-    await setSetting('modelName', newModel);
+    await setSetting("modelName", newModel);
   };
 
   return (
-    <header className="absolute top-0 left-0 right-0 z-30 flex items-center justify-between px-4 py-3 pt-[calc(0.75rem+env(safe-area-inset-top))] bg-black/60 backdrop-blur-xl border-b border-zinc-800/40" data-glass-surface>
+    <header
+      className="absolute top-0 left-0 right-0 z-30 flex items-center justify-between px-4 py-3 pt-[calc(0.75rem+env(safe-area-inset-top))] bg-black/60 backdrop-blur-xl border-b border-zinc-800/40"
+      data-glass-surface
+    >
       <div className="flex items-center gap-3">
         <motion.button
           whileTap={{ scale: 0.95 }}
@@ -67,7 +77,9 @@ export function ChatHeader({
             type="button"
             onClick={activeCharacter ? onAvatarClick : undefined}
             className={`w-8 h-8 rounded-full flex items-center justify-center shadow-lg overflow-hidden ${
-              activeCharacter ? "cursor-pointer ring-2 ring-blue-500/50 hover:ring-blue-400" : ""
+              activeCharacter
+                ? "cursor-pointer ring-2 ring-blue-500/50 hover:ring-blue-400"
+                : ""
             }`}
           >
             {activeCharacter?.avatar ? (
@@ -89,19 +101,23 @@ export function ChatHeader({
           <div>
             {availableModels.length > 0 ? (
               <select
-                value={modelName || ''}
+                value={modelName || ""}
                 onChange={handleModelChange}
                 className="bg-transparent text-[14px] font-semibold text-zinc-900 dark:text-zinc-100 leading-tight tracking-tight outline-none cursor-pointer hover:text-blue-500 dark:hover:text-blue-400 transition-colors max-w-[200px] truncate"
               >
                 {availableModels.map((model) => (
-                  <option key={model} value={model} className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100">
+                  <option
+                    key={model}
+                    value={model}
+                    className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100"
+                  >
                     {model}
                   </option>
                 ))}
               </select>
             ) : (
               <h1 className="text-[14px] font-semibold text-zinc-900 dark:text-zinc-100 leading-tight tracking-tight truncate max-w-[200px]">
-                {activeCharacter?.name || modelName || 'mine.ai'}
+                {activeCharacter?.name || modelName || "mine.ai"}
               </h1>
             )}
             <div className="flex items-center gap-1.5">

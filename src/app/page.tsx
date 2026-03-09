@@ -28,22 +28,40 @@ import { ChatHeader } from "@/components/ChatHeader";
 import { ChatArea } from "@/components/ChatArea";
 import { ChatInput } from "@/components/ChatInput";
 import { CharacterProfileSheet } from "@/components/Character/CharacterProfileSheet";
-import { ConfirmDialog, PromptDialog, SelectDialog } from "@/components/ConfirmDialog";
+import {
+  ConfirmDialog,
+  PromptDialog,
+  SelectDialog,
+} from "@/components/ConfirmDialog";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import dynamic from "next/dynamic";
+
+const ColorBends = dynamic(() => import("@/components/shaders/ColorBends"), {
+  ssr: false,
+});
 
 export default function MineAIChat() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [settingsDefaultScreen, setSettingsDefaultScreen] = useState<string | undefined>(undefined);
+  const [settingsDefaultScreen, setSettingsDefaultScreen] = useState<
+    string | undefined
+  >(undefined);
   const [characterProfileOpen, setCharacterProfileOpen] = useState(false);
   const [inputValue, setInputValue] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
-  const [activeCharacterId, setActiveCharacterId] = useState<number | null>(null);
-  const [activeCharacter, setActiveCharacter] = useState<Character | null>(null);
-  const [modelStatus, setModelStatus] = useState<"online" | "offline" | "unknown">("unknown");
+  const [activeCharacterId, setActiveCharacterId] = useState<number | null>(
+    null,
+  );
+  const [activeCharacter, setActiveCharacter] = useState<Character | null>(
+    null,
+  );
+  const [modelStatus, setModelStatus] = useState<
+    "online" | "offline" | "unknown"
+  >("unknown");
   const [errorToast, setErrorToast] = useState<string | null>(null);
   const [keyboardOffset, setKeyboardOffset] = useState(0);
+  const [accentHex, setAccentHex] = useState("#3b82f6");
   const [clearChatConfirm, setClearChatConfirm] = useState(false);
   const errorToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -54,6 +72,23 @@ export default function MineAIChat() {
     setErrorToast(msg);
     if (errorToastTimer.current) clearTimeout(errorToastTimer.current);
     errorToastTimer.current = setTimeout(() => setErrorToast(null), 6000);
+  }, []);
+
+  // Track accent color from CSS variable for ColorBends background
+  useEffect(() => {
+    const readAccent = () => {
+      const hex = getComputedStyle(document.documentElement)
+        .getPropertyValue("--primary-hex")
+        .trim();
+      if (hex) setAccentHex(hex);
+    };
+    readAccent();
+    const observer = new MutationObserver(readAccent);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["style"],
+    });
+    return () => observer.disconnect();
   }, []);
 
   // Initialize database on mount
@@ -71,11 +106,14 @@ export default function MineAIChat() {
   useEffect(() => {
     const testConnection = async () => {
       const settings = await getAllSettings();
-      
+
       // Only test if API URL and model are configured
       if (settings.apiUrl && settings.modelName) {
-        const result = await testAPIConnection(settings.apiUrl, settings.modelName);
-        
+        const result = await testAPIConnection(
+          settings.apiUrl,
+          settings.modelName,
+        );
+
         if (result.success) {
           setModelStatus("online");
         } else {
@@ -107,7 +145,8 @@ export default function MineAIChat() {
           getAllSettings().then((settings) => {
             if (settings.apiUrl && settings.modelName) {
               testAPIConnection(settings.apiUrl, settings.modelName).then(
-                (result) => setModelStatus(result.success ? "online" : "offline")
+                (result) =>
+                  setModelStatus(result.success ? "online" : "offline"),
               );
             }
           });
@@ -149,273 +188,296 @@ export default function MineAIChat() {
      Having them here caused race conditions on initial load. */
 
   // Get bubble style from settings
-  const bubbleStyle = useLiveQuery(() => getSetting("bubble_style")) || "default";
+  const bubbleStyle =
+    useLiveQuery(() => getSetting("bubble_style")) || "default";
 
-  const handleSend = useCallback(async (message: string, file?: File) => {
-    const trimmed = message.trim();
-    if (!trimmed && !file) return;
-    if (isTyping) return;
+  const handleSend = useCallback(
+    async (message: string, file?: File) => {
+      const trimmed = message.trim();
+      if (!trimmed && !file) return;
+      if (isTyping) return;
 
-    // Create new thread if none exists
-    let threadId = activeThreadId;
-    if (!threadId) {
-      const newThread = await createThread();
-      threadId = newThread.id;
-      setActiveThreadId(threadId);
-    }
-
-    // ═══ JUST-IN-TIME FETCHING (PREVENT STALE STATE) ═══
-    // Force-fetch fresh settings and thread state immediately before sending
-    const settings = await getAllSettings();
-    const isIncognito = settings.incognito_active;
-    const currentThread = await db.threads.get(threadId);
-    
-    // Fetch character directly from DB if thread is associated with one
-    let currentCharacter: Character | null = null;
-    if (currentThread?.characterId) {
-      const char = await getCharacter(currentThread.characterId);
-      if (char) {
-        currentCharacter = char;
+      // Create new thread if none exists
+      let threadId = activeThreadId;
+      if (!threadId) {
+        const newThread = await createThread();
+        threadId = newThread.id;
+        setActiveThreadId(threadId);
       }
-    }
 
-    // ═══ FILE PARSING (RAG) ═══
-    let userMessage = trimmed;
-    let displayMessage = trimmed;
-    
-    if (file) {
-      // Show user we're processing the file
-      displayMessage = `${trimmed}\n\n[📎 Attached: ${file.name}]`;
-      
-      // Parse the file content
-      const parseResult = await parseFile(file);
-      
-      if (parseResult.success) {
-        // Format the message with file context for the AI
-        userMessage = formatFileContext(parseResult, trimmed);
+      // ═══ JUST-IN-TIME FETCHING (PREVENT STALE STATE) ═══
+      // Force-fetch fresh settings and thread state immediately before sending
+      const settings = await getAllSettings();
+      const isIncognito = settings.incognito_active;
+      const currentThread = await db.threads.get(threadId);
+
+      // Fetch character directly from DB if thread is associated with one
+      let currentCharacter: Character | null = null;
+      if (currentThread?.characterId) {
+        const char = await getCharacter(currentThread.characterId);
+        if (char) {
+          currentCharacter = char;
+        }
+      }
+
+      // ═══ FILE PARSING (RAG) ═══
+      let userMessage = trimmed;
+      let displayMessage = trimmed;
+
+      if (file) {
+        // Show user we're processing the file
+        displayMessage = `${trimmed}\n\n[📎 Attached: ${file.name}]`;
+
+        // Parse the file content
+        const parseResult = await parseFile(file);
+
+        if (parseResult.success) {
+          // Format the message with file context for the AI
+          userMessage = formatFileContext(parseResult, trimmed);
+        } else {
+          // If parsing fails, inform the user
+          displayMessage = `${trimmed}\n\n[⚠️ ${file.name} - ${parseResult.error}]`;
+          userMessage = displayMessage;
+        }
+      }
+
+      // Add user message to DB (display version with filename) — skip in incognito
+      if (!isIncognito) {
+        await addMessage(threadId, "user", displayMessage);
+      }
+      // Don't clear input yet — only clear after successful stream
+      setIsTyping(true);
+
+      // Prepare AI message — in incognito, use in-memory only
+      const aiMessageId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      if (!isIncognito) {
+        await db.messages.add({
+          id: aiMessageId,
+          threadId,
+          role: "ai",
+          content: "",
+          timestamp: new Date(),
+        });
+      }
+
+      // ═══ SYSTEM PROMPT CONSTRUCTION ═══
+      // Build the system prompt strictly from character data or use safe default
+      let systemPrompt: string;
+
+      // If chatting with a character, build an authoritative character prompt
+      if (currentCharacter) {
+        const parts: string[] = [];
+        parts.push(`You are ${currentCharacter.name}.`);
+        if (currentCharacter.subtitle)
+          parts.push(currentCharacter.subtitle + ".");
+        if (currentCharacter.description)
+          parts.push(currentCharacter.description);
+        // Definition is the PRIMARY behavioral instruction set for this character
+        if (currentCharacter.definition && currentCharacter.definition.trim()) {
+          parts.push("\n\n" + currentCharacter.definition.trim());
+        }
+        // Enforcement: prevent the model from breaking character
+        parts.push(
+          `\n\nIMPORTANT: Stay in character at all times as ${currentCharacter.name}. Never break character, never say you are an AI or a language model. Always respond from the perspective and personality described above.`,
+        );
+        systemPrompt = parts.join(" ");
       } else {
-        // If parsing fails, inform the user
-        displayMessage = `${trimmed}\n\n[⚠️ ${file.name} - ${parseResult.error}]`;
-        userMessage = displayMessage;
+        // Use user's custom system prompt from settings, or safe default
+        systemPrompt =
+          settings.systemPrompt ||
+          "You are mine.ai, a private, local-first AI assistant.";
       }
-    }
 
-    // Add user message to DB (display version with filename) — skip in incognito
-    if (!isIncognito) {
-      await addMessage(threadId, "user", displayMessage);
-    }
-    // Don't clear input yet — only clear after successful stream
-    setIsTyping(true);
+      // ═══ USER PROFILE INJECTION ═══
+      // REMOVED: Profile injection is now handled centrally by api.ts (streamAIResponse)
+      // to prevent double-injection. See api.ts "IDENTITY INJECTION (Service-Level)".
 
-    // Prepare AI message — in incognito, use in-memory only
-    const aiMessageId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    if (!isIncognito) {
-      await db.messages.add({
-        id: aiMessageId,
-        threadId,
-        role: "ai",
-        content: "",
-        timestamp: new Date(),
-      });
-    }
+      // Prepare message history
+      const history = await db.messages
+        .where("threadId")
+        .equals(threadId)
+        .sortBy("timestamp");
 
-    // ═══ SYSTEM PROMPT CONSTRUCTION ═══
-    // Build the system prompt strictly from character data or use safe default
-    let systemPrompt: string;
-    
-    // If chatting with a character, build an authoritative character prompt
-    if (currentCharacter) {
-      const parts: string[] = [];
-      parts.push(`You are ${currentCharacter.name}.`);
-      if (currentCharacter.subtitle) parts.push(currentCharacter.subtitle + '.');
-      if (currentCharacter.description) parts.push(currentCharacter.description);
-      // Definition is the PRIMARY behavioral instruction set for this character
-      if (currentCharacter.definition && currentCharacter.definition.trim()) {
-        parts.push('\n\n' + currentCharacter.definition.trim());
+      const rawMessages: ChatMessage[] = history
+        .filter((m) => m.role !== "ai" || m.content) // Exclude empty AI messages
+        .map((m) => ({
+          role: m.role === "ai" ? ("assistant" as const) : ("user" as const),
+          content: m.content,
+        }));
+
+      // Replace the last user message with the RAG-enhanced version
+      if (
+        rawMessages.length > 0 &&
+        rawMessages[rawMessages.length - 1].role === "user"
+      ) {
+        rawMessages[rawMessages.length - 1].content = userMessage;
       }
-      // Enforcement: prevent the model from breaking character
-      parts.push(`\n\nIMPORTANT: Stay in character at all times as ${currentCharacter.name}. Never break character, never say you are an AI or a language model. Always respond from the perspective and personality described above.`);
-      systemPrompt = parts.join(' ');
-    } else {
-      // Use user's custom system prompt from settings, or safe default
-      systemPrompt = settings.systemPrompt || "You are mine.ai, a private, local-first AI assistant.";
-    }
 
-    // ═══ USER PROFILE INJECTION ═══
-    // REMOVED: Profile injection is now handled centrally by api.ts (streamAIResponse)
-    // to prevent double-injection. See api.ts "IDENTITY INJECTION (Service-Level)".
-
-    // Prepare message history
-    const history = await db.messages
-      .where("threadId")
-      .equals(threadId)
-      .sortBy("timestamp");
-
-    const rawMessages: ChatMessage[] = history
-      .filter((m) => m.role !== "ai" || m.content) // Exclude empty AI messages
-      .map((m) => ({
-        role: m.role === "ai" ? ("assistant" as const) : ("user" as const),
-        content: m.content,
-      }));
-
-    // Replace the last user message with the RAG-enhanced version
-    if (rawMessages.length > 0 && rawMessages[rawMessages.length - 1].role === "user") {
-      rawMessages[rawMessages.length - 1].content = userMessage;
-    }
-
-    /* REFACTOR: Token-aware sliding window truncation.
+      /* REFACTOR: Token-aware sliding window truncation.
        Replaces naive slice(-10) — now respects the configured context_length,
        estimates token usage, and leaves 25% headroom for the model's response.
        System prompt and the latest user message are always preserved. */
-    const truncationResult = truncateToFit(
-      systemPrompt,
-      rawMessages,
-      settings.context_length || 4096
-    );
-
-    if (truncationResult.truncated) {
-      console.info(
-        `[context] Truncated: ${truncationResult.originalCount} → ${truncationResult.finalCount} messages (≈${truncationResult.estimatedTokens} tokens)`
+      const truncationResult = truncateToFit(
+        systemPrompt,
+        rawMessages,
+        settings.context_length || 4096,
       );
-    }
 
-    /* The truncated messages already include the system prompt at index 0.
+      if (truncationResult.truncated) {
+        console.info(
+          `[context] Truncated: ${truncationResult.originalCount} → ${truncationResult.finalCount} messages (≈${truncationResult.estimatedTokens} tokens)`,
+        );
+      }
+
+      /* The truncated messages already include the system prompt at index 0.
        Strip it out since streamAIResponse adds it separately. */
-    const apiMessages = truncationResult.messages
-      .filter((m) => m.role !== "system")
-      .map((m) => ({
-        role: m.role as "user" | "assistant",
-        content: m.content,
-      }));
+      const apiMessages = truncationResult.messages
+        .filter((m) => m.role !== "system")
+        .map((m) => ({
+          role: m.role as "user" | "assistant",
+          content: m.content,
+        }));
 
-    let accumulatedRawContent = "";
-    let accumulatedThinking = "";
+      let accumulatedRawContent = "";
+      let accumulatedThinking = "";
 
-    // ── Throttle DB writes during streaming ──
-    // Without throttling, updateMessage fires on every token (~10-50ms apart),
-    // which triggers useLiveQuery re-renders at the same rate. Throttling to
-    // ~80ms intervals reduces DB writes by ~5-10x while keeping the UI responsive.
-    let pendingUpdate: Partial<{ content: string; thinking: string }> | null = null;
-    let flushTimer: ReturnType<typeof setTimeout> | null = null;
-    const THROTTLE_MS = 80;
+      // ── Throttle DB writes during streaming ──
+      // Without throttling, updateMessage fires on every token (~10-50ms apart),
+      // which triggers useLiveQuery re-renders at the same rate. Throttling to
+      // ~80ms intervals reduces DB writes by ~5-10x while keeping the UI responsive.
+      let pendingUpdate: Partial<{ content: string; thinking: string }> | null =
+        null;
+      let flushTimer: ReturnType<typeof setTimeout> | null = null;
+      const THROTTLE_MS = 80;
 
-    const flushPendingUpdate = () => {
-      if (pendingUpdate && !isIncognito) {
-        updateMessage(aiMessageId, pendingUpdate).catch((err) => {
-          console.error("Failed to update message:", err);
+      const flushPendingUpdate = () => {
+        if (pendingUpdate && !isIncognito) {
+          updateMessage(aiMessageId, pendingUpdate).catch((err) => {
+            console.error("Failed to update message:", err);
+          });
+          pendingUpdate = null;
+        }
+        flushTimer = null;
+      };
+
+      const throttledUpdateMessage = (
+        updates: Partial<{ content: string; thinking: string }>,
+      ) => {
+        pendingUpdate = updates;
+        if (!flushTimer) {
+          flushTimer = setTimeout(flushPendingUpdate, THROTTLE_MS);
+        }
+      };
+
+      // Helper: parse <think> tags from streamed content
+      const separateThinkTags = (
+        raw: string,
+      ): { content: string; thinking: string } => {
+        let thinking = "";
+        let content = raw;
+        // Extract completed <think>...</think> blocks
+        content = content.replace(/<think>([\s\S]*?)<\/think>/g, (_, t) => {
+          thinking += t;
+          return "";
         });
-        pendingUpdate = null;
-      }
-      flushTimer = null;
-    };
+        // Handle unclosed <think> (still streaming thinking)
+        const openIdx = content.indexOf("<think>");
+        if (openIdx !== -1) {
+          thinking += content.slice(openIdx + 7);
+          content = content.slice(0, openIdx);
+        }
+        return { content: content.trim(), thinking: thinking.trim() };
+      };
 
-    const throttledUpdateMessage = (updates: Partial<{ content: string; thinking: string }>) => {
-      pendingUpdate = updates;
-      if (!flushTimer) {
-        flushTimer = setTimeout(flushPendingUpdate, THROTTLE_MS);
-      }
-    };
+      // Create abort controller for this stream
+      const abortController = new AbortController();
+      abortControllerRef.current = abortController;
 
-    // Helper: parse <think> tags from streamed content
-    const separateThinkTags = (raw: string): { content: string; thinking: string } => {
-      let thinking = '';
-      let content = raw;
-      // Extract completed <think>...</think> blocks
-      content = content.replace(/<think>([\s\S]*?)<\/think>/g, (_, t) => {
-        thinking += t;
-        return '';
-      });
-      // Handle unclosed <think> (still streaming thinking)
-      const openIdx = content.indexOf('<think>');
-      if (openIdx !== -1) {
-        thinking += content.slice(openIdx + 7);
-        content = content.slice(0, openIdx);
-      }
-      return { content: content.trim(), thinking: thinking.trim() };
-    };
-
-    // Create abort controller for this stream
-    const abortController = new AbortController();
-    abortControllerRef.current = abortController;
-
-    try {
-      setModelStatus("online");
-      await streamAIResponse({
-        apiUrl: settings.apiUrl,
-        modelName: settings.modelName,
-        systemPrompt, // Now uses the correct system prompt!
-        temperature: settings.temperature,
-        topP: settings.top_p,
-        contextLength: settings.context_length,
-        messages: apiMessages,
-        signal: abortController.signal,
-        onChunk: (chunk) => {
-          accumulatedRawContent += chunk;
-          const parsed = separateThinkTags(accumulatedRawContent);
-          const mergedThinking = [accumulatedThinking, parsed.thinking].filter(Boolean).join('\n');
-          if (!isIncognito) {
-            throttledUpdateMessage({
-              content: parsed.content,
-              ...(mergedThinking ? { thinking: mergedThinking } : {}),
-            });
-          }
-        },
-        onThinking: (thinking) => {
-          if (settings.thinkingEnabled) {
-            accumulatedThinking += thinking;
+      try {
+        setModelStatus("online");
+        await streamAIResponse({
+          apiUrl: settings.apiUrl,
+          modelName: settings.modelName,
+          systemPrompt, // Now uses the correct system prompt!
+          temperature: settings.temperature,
+          topP: settings.top_p,
+          contextLength: settings.context_length,
+          messages: apiMessages,
+          signal: abortController.signal,
+          onChunk: (chunk) => {
+            accumulatedRawContent += chunk;
+            const parsed = separateThinkTags(accumulatedRawContent);
+            const mergedThinking = [accumulatedThinking, parsed.thinking]
+              .filter(Boolean)
+              .join("\n");
             if (!isIncognito) {
-              throttledUpdateMessage({ thinking: accumulatedThinking });
+              throttledUpdateMessage({
+                content: parsed.content,
+                ...(mergedThinking ? { thinking: mergedThinking } : {}),
+              });
             }
-          }
-        },
-        onComplete: () => {
-          // Flush any remaining buffered content to DB immediately
-          if (flushTimer) clearTimeout(flushTimer);
-          flushPendingUpdate();
-          setIsTyping(false);
-          setInputValue(""); // Clear input on success
-          abortControllerRef.current = null;
-        },
-        onError: (error) => {
-          // Cancel any pending throttled write
-          if (flushTimer) clearTimeout(flushTimer);
-          // Don't show error if user manually aborted
-          if (error.name === "AbortError") {
-            flushPendingUpdate(); // Save whatever we accumulated
+          },
+          onThinking: (thinking) => {
+            if (settings.thinkingEnabled) {
+              accumulatedThinking += thinking;
+              if (!isIncognito) {
+                throttledUpdateMessage({ thinking: accumulatedThinking });
+              }
+            }
+          },
+          onComplete: () => {
+            // Flush any remaining buffered content to DB immediately
+            if (flushTimer) clearTimeout(flushTimer);
+            flushPendingUpdate();
             setIsTyping(false);
-            setInputValue(""); // user intentionally stopped
+            setInputValue(""); // Clear input on success
             abortControllerRef.current = null;
-            return;
-          }
-          /* REFACTOR: Errors go to a floating toast — NOT saved to DB.
+          },
+          onError: (error) => {
+            // Cancel any pending throttled write
+            if (flushTimer) clearTimeout(flushTimer);
+            // Don't show error if user manually aborted
+            if (error.name === "AbortError") {
+              flushPendingUpdate(); // Save whatever we accumulated
+              setIsTyping(false);
+              setInputValue(""); // user intentionally stopped
+              abortControllerRef.current = null;
+              return;
+            }
+            /* REFACTOR: Errors go to a floating toast — NOT saved to DB.
              The empty AI placeholder is removed so the conversation
              stays clean and the user can retry with input preserved. */
-          console.error("Streaming error:", error);
-          setModelStatus("offline");
-          const userMsg = error instanceof NetworkError
-            ? error.userMessage
-            : `Error: ${error.message}`;
-          // Remove the empty AI placeholder message (if persisted)
-          if (!isIncognito) {
-            db.messages.delete(aiMessageId).catch(() => {});
-          }
-          showErrorToast(`${userMsg} — check your API settings and connection.`);
-          setIsTyping(false);
-          // Input is NOT cleared — user can retry
-        },
-      });
-    } catch (error) {
-      console.error("Failed to send message:", error);
-      setModelStatus("offline");
-      // Remove the empty AI placeholder message (if persisted)
-      if (!isIncognito) {
-        db.messages.delete(aiMessageId).catch(() => {});
+            console.error("Streaming error:", error);
+            setModelStatus("offline");
+            const userMsg =
+              error instanceof NetworkError
+                ? error.userMessage
+                : `Error: ${error.message}`;
+            // Remove the empty AI placeholder message (if persisted)
+            if (!isIncognito) {
+              db.messages.delete(aiMessageId).catch(() => {});
+            }
+            showErrorToast(
+              `${userMsg} — check your API settings and connection.`,
+            );
+            setIsTyping(false);
+            // Input is NOT cleared — user can retry
+          },
+        });
+      } catch (error) {
+        console.error("Failed to send message:", error);
+        setModelStatus("offline");
+        // Remove the empty AI placeholder message (if persisted)
+        if (!isIncognito) {
+          db.messages.delete(aiMessageId).catch(() => {});
+        }
+        showErrorToast("Unexpected error occurred. Please try again.");
+        setIsTyping(false);
+        // Input is NOT cleared — user can retry
       }
-      showErrorToast("Unexpected error occurred. Please try again.");
-      setIsTyping(false);
-      // Input is NOT cleared — user can retry
-    }
-  }, [isTyping, activeThreadId, showErrorToast]); // isTyping guards re-entry; activeThreadId for thread context; showErrorToast is stable ([] deps). DB reads are JIT-fetched (not closured).
+    },
+    [isTyping, activeThreadId, showErrorToast],
+  ); // isTyping guards re-entry; activeThreadId for thread context; showErrorToast is stable ([] deps). DB reads are JIT-fetched (not closured).
 
   const handleClearChat = useCallback(async () => {
     if (!activeThreadId) return;
@@ -427,12 +489,12 @@ export default function MineAIChat() {
     if (!activeThreadId) return;
 
     await db.messages.where("threadId").equals(activeThreadId).delete();
-    
+
     // Add welcome message
     await addMessage(
       activeThreadId,
       "ai",
-      "Conversation cleared. How can I help you?"
+      "Conversation cleared. How can I help you?",
     );
   }, [activeThreadId]);
 
@@ -455,35 +517,44 @@ export default function MineAIChat() {
     // Set the active character
     setActiveCharacterId(character.id || null);
     setActiveCharacter(character);
-    
+
     // Create a new thread for this character or get the most recent one
     const existingThreads = await db.threads
       .where("characterId")
       .equals(character.id || 0)
       .reverse()
       .sortBy("updatedAt");
-    
+
     let threadId: string;
     if (existingThreads.length > 0) {
       threadId = existingThreads[0].id;
     } else {
       // Create new character thread
-      const newThread = await createCharacterThread(character.id || 0, `Chat with ${character.name}`);
+      const newThread = await createCharacterThread(
+        character.id || 0,
+        `Chat with ${character.name}`,
+      );
       threadId = newThread.id;
-      
+
       // Add initial greeting if available
       if (character.greetings && character.greetings.length > 0) {
-        const greeting = character.greetings[Math.floor(Math.random() * character.greetings.length)];
+        const greeting =
+          character.greetings[
+            Math.floor(Math.random() * character.greetings.length)
+          ];
         await addMessage(threadId, "ai", greeting);
       }
     }
-    
+
     setActiveThreadId(threadId);
     setSidebarOpen(false);
   }, []);
 
   return (
-    <div className="relative flex h-dvh w-full overflow-hidden bg-background" data-glass-bg>
+    <div
+      className="relative flex h-dvh w-full overflow-hidden bg-background"
+      data-glass-bg
+    >
       {/* iOS Safe Area Background Extension */}
       <div className="fixed inset-0 bg-background -z-10" data-glass-bg />
 
@@ -493,14 +564,27 @@ export default function MineAIChat() {
         onClose={() => setSidebarOpen(false)}
         activeThreadId={activeThreadId}
         onSelectThread={setActiveThreadId}
-        onOpenSettings={() => { setSettingsDefaultScreen(undefined); setSettingsOpen(true); }}
+        onOpenSettings={() => {
+          setSettingsDefaultScreen(undefined);
+          setSettingsOpen(true);
+        }}
         onSelectCharacter={handleSelectCharacter}
         activeCharacterId={activeCharacterId}
-        onOpenIdentity={() => { setSettingsDefaultScreen("identity"); setSettingsOpen(true); }}
+        onOpenIdentity={() => {
+          setSettingsDefaultScreen("identity");
+          setSettingsOpen(true);
+        }}
       />
 
       {/* Settings Bottom Sheet */}
-      <SettingsSheet isOpen={settingsOpen} onClose={() => { setSettingsOpen(false); setSettingsDefaultScreen(undefined); }} defaultScreen={settingsDefaultScreen as any} />
+      <SettingsSheet
+        isOpen={settingsOpen}
+        onClose={() => {
+          setSettingsOpen(false);
+          setSettingsDefaultScreen(undefined);
+        }}
+        defaultScreen={settingsDefaultScreen as any}
+      />
 
       {/* Character Profile Sheet */}
       <CharacterProfileSheet
@@ -526,6 +610,23 @@ export default function MineAIChat() {
           aria-hidden="true"
         />
 
+        {/* WebGL Color Bends background — pointer-events-none so UI stays interactive */}
+        <div
+          className="absolute inset-0 z-0 pointer-events-none"
+          aria-hidden="true"
+        >
+          <ColorBends
+            colors={[accentHex, "#6366f1", "#1e1b4b"]}
+            speed={0.2}
+            noise={0.08}
+            warpStrength={0.8}
+            frequency={0.9}
+            transparent={false}
+            mouseInfluence={0.4}
+            parallax={0.3}
+          />
+        </div>
+
         {/* Header with Safe Area */}
         <ChatHeader
           onMenuClick={() => setSidebarOpen(true)}
@@ -537,9 +638,9 @@ export default function MineAIChat() {
         />
 
         {/* Scrollable Messages */}
-        <ChatArea 
-          threadId={activeThreadId} 
-          isTyping={isTyping} 
+        <ChatArea
+          threadId={activeThreadId}
+          isTyping={isTyping}
           bubbleStyle={bubbleStyle as any}
           characterAvatar={activeCharacter?.avatar}
           onSuggestionClick={(text) => handleSend(text)}
@@ -564,8 +665,12 @@ export default function MineAIChat() {
               className="flex items-start gap-3 rounded-2xl border border-red-300/30 dark:border-red-500/20 bg-red-100/80 dark:bg-red-950/60 px-4 py-3 shadow-lg backdrop-blur-xl"
               role="alert"
             >
-              <span className="mt-0.5 shrink-0 text-red-500 dark:text-red-400">&#x26A0;</span>
-              <p className="flex-1 text-sm text-red-700 dark:text-red-200 leading-snug">{errorToast}</p>
+              <span className="mt-0.5 shrink-0 text-red-500 dark:text-red-400">
+                &#x26A0;
+              </span>
+              <p className="flex-1 text-sm text-red-700 dark:text-red-200 leading-snug">
+                {errorToast}
+              </p>
               <button
                 type="button"
                 onClick={() => setErrorToast(null)}
