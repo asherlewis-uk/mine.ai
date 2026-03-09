@@ -1,0 +1,98 @@
+/* ─── GlassCard ──────────────────────────────────────────────────
+   Layered glass card: glow → border → surface → content.
+   Pointer position tracked via --px / --py CSS custom properties.
+   ──────────────────────────────────────────────────────────────── */
+
+.glass-card-container {
+  position: relative;
+  border-radius: var(--vibes-border-radius-card, 24px);
+  isolation: isolate;
+}
+
+/* ── Glow layer (behind everything) ────────────────────────────── */
+
+.glass-card-glow {
+  position: absolute;
+  inset: -8px;
+  border-radius: inherit;
+  z-index: -2;
+  pointer-events: none;
+  filter: blur(var(--vibes-glow-blur, 24px));
+  opacity: 0.6;
+  transition: opacity 0.3s;
+}
+
+.glass-card-container:hover .glass-card-glow {
+  opacity: 0.85;
+}
+
+.glass-card-glow--spectral-edge {
+  background: conic-gradient(
+    from 135deg at var(--px, 50%) var(--py, 50%),
+    var(--vibes-spectral-green),
+    var(--vibes-spectral-cyan),
+    var(--vibes-spectral-magenta),
+    var(--vibes-spectral-orange),
+    var(--vibes-spectral-green)
+  );
+}
+
+.glass-card-glow--teal-core {
+  background: radial-gradient(
+    circle at var(--px, 50%) var(--py, 50%),
+    rgba(var(--vibes-teal-rgb), 0.45),
+    rgba(var(--vibes-teal-rgb), 0) 70%
+  );
+}
+
+/* ── Border layer ──────────────────────────────────────────────── */
+
+.glass-card-border {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  z-index: -1;
+  pointer-events: none;
+  padding: var(--vibes-border-width, 1.5px);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+          mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+}
+
+.glass-card-border--spectral-edge {
+  background: conic-gradient(
+    from 135deg at var(--px, 50%) var(--py, 50%),
+    rgba(0, 255, 127, 0.9),
+    rgba(0, 229, 204, 0.9),
+    rgba(255, 0, 255, 0.7),
+    rgba(255, 165, 0, 0.8),
+    rgba(0, 255, 127, 0.9)
+  );
+}
+
+.glass-card-border--teal-core {
+  background: linear-gradient(
+    135deg,
+    rgba(var(--vibes-teal-rgb), 0.7),
+    rgba(var(--vibes-teal-rgb), 0.3)
+  );
+}
+
+/* ── Surface (glass backdrop) ──────────────────────────────────── */
+
+.glass-card-surface {
+  position: relative;
+  border-radius: inherit;
+  background: var(--vibes-surface, rgba(8, 8, 8, 0.85));
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  overflow: hidden;
+}
+
+/* ── Content ───────────────────────────────────────────────────── */
+
+.glass-card-content {
+  position: relative;
+  padding: var(--vibes-spacing-lg, 24px);
+}
