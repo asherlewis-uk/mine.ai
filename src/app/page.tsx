@@ -43,6 +43,8 @@ const ColorBends = dynamic(() => import("@/components/shaders/ColorBends"), {
 export default function MineAIChat() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [isRestoringInitialThread, setIsRestoringInitialThread] =
+    useState(true);
   const [settingsDefaultScreen, setSettingsDefaultScreen] = useState<
     "identity" | undefined
   >(undefined);
@@ -93,13 +95,31 @@ export default function MineAIChat() {
 
   // Initialize database on mount
   useEffect(() => {
-    initializeDatabase().then(async () => {
-      // Set initial active thread to the most recent one
-      const threads = await db.threads.orderBy("updatedAt").reverse().toArray();
-      if (threads.length > 0) {
-        setActiveThreadId(threads[0].id);
+    let cancelled = false;
+
+    const restoreInitialThread = async () => {
+      try {
+        await initializeDatabase();
+
+        // Set initial active thread to the most recent one
+        const threads = await db.threads.orderBy("updatedAt").reverse().toArray();
+        if (!cancelled) {
+          setActiveThreadId(threads[0]?.id ?? null);
+        }
+      } catch (error) {
+        console.error("Failed to restore initial thread:", error);
+      } finally {
+        if (!cancelled) {
+          setIsRestoringInitialThread(false);
+        }
       }
-    });
+    };
+
+    restoreInitialThread();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   /* REFACTOR: Zombie State handler — abort stale streams when app resumes
@@ -685,6 +705,7 @@ export default function MineAIChat() {
         <ChatArea
           key={activeThreadId ?? "no-thread"}
           threadId={activeThreadId}
+          isInitialLoadPending={isRestoringInitialThread}
           isTyping={isTyping}
           bubbleStyle={bubbleStyle as any}
           characterAvatar={activeCharacter?.avatar}

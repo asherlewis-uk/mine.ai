@@ -10,6 +10,7 @@ import { db } from "@/lib/db";
 
 interface ChatAreaProps {
   threadId: string | null;
+  isInitialLoadPending?: boolean;
   isTyping: boolean;
   bubbleStyle?: "default" | "modern" | "compact";
   characterAvatar?: string; // Optional character avatar
@@ -17,7 +18,7 @@ interface ChatAreaProps {
   keyboardOffset?: number;
 }
 
-export function ChatArea({ threadId, isTyping, bubbleStyle = "default", characterAvatar, onSuggestionClick, keyboardOffset = 0 }: ChatAreaProps) {
+export function ChatArea({ threadId, isInitialLoadPending = false, isTyping, bubbleStyle = "default", characterAvatar, onSuggestionClick, keyboardOffset = 0 }: ChatAreaProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -57,8 +58,9 @@ export function ChatArea({ threadId, isTyping, bubbleStyle = "default", characte
     }
   }, [isTyping]);
 
-  // Scroll to bottom when messages change
-  const shouldShowWelcome = !messages || messages.length === 0;
+  const isMessagesLoading = threadId !== null && messages === undefined;
+  const shouldShowLoading = isInitialLoadPending || isMessagesLoading;
+  const shouldShowWelcome = !shouldShowLoading && (messages?.length ?? 0) === 0;
 
   // ═══ Ghost Loading Box Fix ═══
   // Only show the TypingIndicator bouncing dots when the AI hasn't started
@@ -90,7 +92,14 @@ export function ChatArea({ threadId, isTyping, bubbleStyle = "default", characte
       className="flex-1 overflow-y-auto overscroll-contain pt-[calc(60px+env(safe-area-inset-top))]"
       style={{ paddingBottom: keyboardOffset > 0 ? `${keyboardOffset + 70}px` : 'calc(110px + env(safe-area-inset-bottom))' }}
     >
-      {shouldShowWelcome ? (
+      {shouldShowLoading ? (
+        <div
+          className="flex min-h-full items-center justify-center px-6 pb-8 text-sm text-zinc-500"
+          aria-busy="true"
+        >
+          Loading conversation...
+        </div>
+      ) : shouldShowWelcome ? (
         <WelcomeBanner onSuggestionClick={onSuggestionClick} />
       ) : (
         <>
