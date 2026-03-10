@@ -44,7 +44,7 @@ export default function MineAIChat() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsDefaultScreen, setSettingsDefaultScreen] = useState<
-    string | undefined
+    "identity" | undefined
   >(undefined);
   const [characterProfileOpen, setCharacterProfileOpen] = useState(false);
   const [inputValue, setInputValue] = useState("");
@@ -101,31 +101,6 @@ export default function MineAIChat() {
       }
     });
   }, []);
-
-  // Auto-connect effect: Test API connection on mount
-  useEffect(() => {
-    const testConnection = async () => {
-      const settings = await getAllSettings();
-
-      // Only test if API URL and model are configured
-      if (settings.apiUrl && settings.modelName) {
-        const result = await testAPIConnection(
-          settings.apiUrl,
-          settings.modelName,
-        );
-
-        if (result.success) {
-          setModelStatus("online");
-        } else {
-          setModelStatus("offline");
-        }
-      } else {
-        setModelStatus("unknown");
-      }
-    };
-
-    testConnection();
-  }, []); // Run once on mount
 
   /* REFACTOR: Zombie State handler — abort stale streams when app resumes
      after being backgrounded by iOS/Android. Prevents stuck isTyping state
@@ -190,6 +165,36 @@ export default function MineAIChat() {
   // Get bubble style from settings
   const bubbleStyle =
     useLiveQuery(() => getSetting("bubble_style")) || "default";
+  const apiUrlSetting = useLiveQuery(() => getSetting("apiUrl"));
+  const modelNameSetting = useLiveQuery(() => getSetting("modelName"));
+
+  // Rebind connection status from persisted settings after reload.
+  useEffect(() => {
+    let cancelled = false;
+
+    const testConnection = async () => {
+      if (!apiUrlSetting || !modelNameSetting) {
+        if (!cancelled) setModelStatus("unknown");
+        return;
+      }
+
+      try {
+        const result = await testAPIConnection(apiUrlSetting, modelNameSetting);
+        if (!cancelled) {
+          setModelStatus(result.success ? "online" : "offline");
+        }
+      } catch (error) {
+        console.error("Failed to test API connection:", error);
+        if (!cancelled) setModelStatus("offline");
+      }
+    };
+
+    testConnection();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [apiUrlSetting, modelNameSetting]);
 
   const handleSend = useCallback(
     async (message: string, file?: File) => {
@@ -305,11 +310,15 @@ export default function MineAIChat() {
           content: m.content,
         }));
 
-      // Replace the last user message with the RAG-enhanced version
-      if (
+      // In incognito, the current user prompt is not persisted to Dexie,
+      // so append it in-memory for this one request only.
+      if (isIncognito) {
+        rawMessages.push({ role: "user", content: userMessage });
+      } else if (
         rawMessages.length > 0 &&
         rawMessages[rawMessages.length - 1].role === "user"
       ) {
+        // Replace the last persisted user message with the RAG-enhanced version.
         rawMessages[rawMessages.length - 1].content = userMessage;
       }
 
@@ -437,7 +446,10 @@ export default function MineAIChat() {
             // Cancel any pending throttled write
             if (flushTimer) clearTimeout(flushTimer);
             // Don't show error if user manually aborted
-            if (error.name === "AbortError") {
+            const isManualAbort =
+              error.name === "AbortError" ||
+              (error instanceof NetworkError && error.kind === "stream_abort");
+            if (isManualAbort) {
               flushPendingUpdate(); // Save whatever we accumulated
               setIsTyping(false);
               setInputValue(""); // user intentionally stopped
@@ -550,6 +562,11 @@ export default function MineAIChat() {
     setSidebarOpen(false);
   }, []);
 
+  const openSettings = useCallback((defaultScreen?: "identity") => {
+    setSettingsDefaultScreen(defaultScreen);
+    setSettingsOpen(true);
+  }, []);
+
   return (
     <div
       className="relative flex h-dvh w-full overflow-hidden bg-background"
@@ -564,16 +581,10 @@ export default function MineAIChat() {
         onClose={() => setSidebarOpen(false)}
         activeThreadId={activeThreadId}
         onSelectThread={setActiveThreadId}
-        onOpenSettings={() => {
-          setSettingsDefaultScreen(undefined);
-          setSettingsOpen(true);
-        }}
+        onOpenSettings={() => openSettings()}
         onSelectCharacter={handleSelectCharacter}
         activeCharacterId={activeCharacterId}
-        onOpenIdentity={() => {
-          setSettingsDefaultScreen("identity");
-          setSettingsOpen(true);
-        }}
+        onOpenIdentity={() => openSettings("identity")}
       />
 
       {/* Settings Bottom Sheet */}
@@ -583,7 +594,7 @@ export default function MineAIChat() {
           setSettingsOpen(false);
           setSettingsDefaultScreen(undefined);
         }}
-        defaultScreen={settingsDefaultScreen as any}
+        defaultScreen={settingsDefaultScreen}
       />
 
       {/* Character Profile Sheet */}
@@ -630,7 +641,7 @@ export default function MineAIChat() {
         {/* Header with Safe Area */}
         <ChatHeader
           onMenuClick={() => setSidebarOpen(true)}
-          onSettingsClick={() => setSettingsOpen(true)}
+          onSettingsClick={() => openSettings()}
           onClearChat={handleClearChat}
           modelStatus={modelStatus}
           activeCharacter={activeCharacter}
