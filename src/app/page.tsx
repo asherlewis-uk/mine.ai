@@ -202,23 +202,52 @@ export default function MineAIChat() {
       if (!trimmed && !file) return;
       if (isTyping) return;
 
-      // Create new thread if none exists
-      let threadId = activeThreadId;
-      if (!threadId) {
-        const newThread = await createThread();
-        threadId = newThread.id;
-        setActiveThreadId(threadId);
-      }
-
-      // ═══ JUST-IN-TIME FETCHING (PREVENT STALE STATE) ═══
       // Force-fetch fresh settings and thread state immediately before sending
       const settings = await getAllSettings();
       const isIncognito = settings.incognito_active;
-      const currentThread = await db.threads.get(threadId);
+
+      let threadId = activeThreadId;
+      let currentThread = threadId ? await db.threads.get(threadId) : undefined;
+
+      if (!threadId) {
+        const newThread = activeCharacterId
+          ? await createCharacterThread(
+              activeCharacterId,
+              activeCharacter
+                ? `Chat with ${activeCharacter.name}`
+                : "New Chat",
+              { persist: !isIncognito },
+            )
+          : await createThread("New Chat", { persist: !isIncognito });
+        threadId = newThread.id;
+        setActiveThreadId(threadId);
+        currentThread = isIncognito ? undefined : newThread;
+      } else if (!isIncognito && !currentThread) {
+        // Materialize a real thread when leaving incognito so new messages
+        // resume normal persistence instead of writing orphaned records.
+        const newThread = activeCharacterId
+          ? await createCharacterThread(
+              activeCharacterId,
+              activeCharacter
+                ? `Chat with ${activeCharacter.name}`
+                : "New Chat",
+              { persist: true },
+            )
+          : await createThread("New Chat", { persist: true });
+        threadId = newThread.id;
+        setActiveThreadId(threadId);
+        currentThread = newThread;
+      }
 
       // Fetch character directly from DB if thread is associated with one
-      let currentCharacter: Character | null = null;
-      if (currentThread?.characterId) {
+      let currentCharacter: Character | null =
+        activeCharacterId && activeCharacter?.id === activeCharacterId
+          ? activeCharacter
+          : null;
+      if (
+        currentThread?.characterId &&
+        currentCharacter?.id !== currentThread.characterId
+      ) {
         const char = await getCharacter(currentThread.characterId);
         if (char) {
           currentCharacter = char;
@@ -488,8 +517,8 @@ export default function MineAIChat() {
         // Input is NOT cleared — user can retry
       }
     },
-    [isTyping, activeThreadId, showErrorToast],
-  ); // isTyping guards re-entry; activeThreadId for thread context; showErrorToast is stable ([] deps). DB reads are JIT-fetched (not closured).
+    [isTyping, activeThreadId, activeCharacterId, activeCharacter, showErrorToast],
+  ); // isTyping guards re-entry; active thread/character state is needed for thread materialization; showErrorToast is stable ([] deps). DB settings and persisted thread reads stay JIT-fetched.
 
   const handleClearChat = useCallback(async () => {
     if (!activeThreadId) return;
@@ -530,6 +559,9 @@ export default function MineAIChat() {
     setActiveCharacterId(character.id || null);
     setActiveCharacter(character);
 
+    const settings = await getAllSettings();
+    const isIncognito = settings.incognito_active;
+
     // Create a new thread for this character or get the most recent one
     const existingThreads = await db.threads
       .where("characterId")
@@ -545,11 +577,12 @@ export default function MineAIChat() {
       const newThread = await createCharacterThread(
         character.id || 0,
         `Chat with ${character.name}`,
+        { persist: !isIncognito },
       );
       threadId = newThread.id;
 
       // Add initial greeting if available
-      if (character.greetings && character.greetings.length > 0) {
+      if (!isIncognito && character.greetings && character.greetings.length > 0) {
         const greeting =
           character.greetings[
             Math.floor(Math.random() * character.greetings.length)
