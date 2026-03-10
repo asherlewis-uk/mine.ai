@@ -29,6 +29,8 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+hs_err_pid*
+replay_pid*
 
 # env files (can opt-in for committing if needed)
 .env*
@@ -43,3 +45,6 @@ next-env.d.ts
 #MCP Config
 /ui_workflow
 ui_workflow
+# local secret/tooling config
+.nano-banana-config.json
+.codex/
