@@ -683,6 +683,7 @@ export default function MineAIChat() {
 
         {/* Scrollable Messages */}
         <ChatArea
+          key={activeThreadId ?? "no-thread"}
           threadId={activeThreadId}
           isTyping={isTyping}
           bubbleStyle={bubbleStyle as any}
