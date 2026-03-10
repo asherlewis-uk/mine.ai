@@ -6,10 +6,11 @@ import { TypingIndicator } from "./TypingIndicator";
 import { WelcomeBanner } from "./WelcomeBanner";
 import { DateDivider } from "./DateDivider";
 import { ErrorBoundary } from "./ErrorBoundary";
-import { db } from "@/lib/db";
+import { db, type Message } from "@/lib/db";
 
 interface ChatAreaProps {
   threadId: string | null;
+  sessionMessages?: Message[];
   isInitialLoadPending?: boolean;
   isTyping: boolean;
   bubbleStyle?: "default" | "modern" | "compact";
@@ -18,11 +19,20 @@ interface ChatAreaProps {
   keyboardOffset?: number;
 }
 
-export function ChatArea({ threadId, isInitialLoadPending = false, isTyping, bubbleStyle = "default", characterAvatar, onSuggestionClick, keyboardOffset = 0 }: ChatAreaProps) {
+export function ChatArea({
+  threadId,
+  sessionMessages = [],
+  isInitialLoadPending = false,
+  isTyping,
+  bubbleStyle = "default",
+  characterAvatar,
+  onSuggestionClick,
+  keyboardOffset = 0,
+}: ChatAreaProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const messages = useLiveQuery(
+  const persistedMessages = useLiveQuery(
     async () => {
       if (!threadId) return [];
       return db.messages
@@ -33,6 +43,17 @@ export function ChatArea({ threadId, isInitialLoadPending = false, isTyping, bub
     [threadId]
   );
 
+  const messages = useMemo(() => {
+    const combined = [
+      ...(persistedMessages ?? []),
+      ...sessionMessages,
+    ];
+
+    return combined.sort(
+      (a, b) => a.timestamp.getTime() - b.timestamp.getTime(),
+    );
+  }, [persistedMessages, sessionMessages]);
+
   // Auto-scroll to bottom when messages change (including streaming content updates)
   // useLiveQuery re-fires on every Dexie update, so this catches streaming tokens too
   // Use "instant" during streaming to prevent stacking smooth scroll animations
@@ -40,7 +61,7 @@ export function ChatArea({ threadId, isInitialLoadPending = false, isTyping, bub
   isTypingRef.current = isTyping;
 
   useLayoutEffect(() => {
-    if (!messages || messages.length === 0) return;
+    if (messages.length === 0) return;
     // Small delay to let the DOM update with new content
     requestAnimationFrame(() => {
       messagesEndRef.current?.scrollIntoView({
@@ -58,9 +79,12 @@ export function ChatArea({ threadId, isInitialLoadPending = false, isTyping, bub
     }
   }, [isTyping]);
 
-  const isMessagesLoading = threadId !== null && messages === undefined;
+  const isMessagesLoading =
+    threadId !== null &&
+    persistedMessages === undefined &&
+    sessionMessages.length === 0;
   const shouldShowLoading = isInitialLoadPending || isMessagesLoading;
-  const shouldShowWelcome = !shouldShowLoading && (messages?.length ?? 0) === 0;
+  const shouldShowWelcome = !shouldShowLoading && messages.length === 0;
 
   // ═══ Ghost Loading Box Fix ═══
   // Only show the TypingIndicator bouncing dots when the AI hasn't started
@@ -70,7 +94,7 @@ export function ChatArea({ threadId, isInitialLoadPending = false, isTyping, bub
   // premature flicker.
   const [showIndicator, setShowIndicator] = useState(false);
   
-  const lastMessage = messages && messages.length > 0 ? messages[messages.length - 1] : null;
+  const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
   const lastAiMessageHasContent = lastMessage?.role === "ai" && (lastMessage.content?.trim().length ?? 0) > 0;
 
   useEffect(() => {
@@ -103,10 +127,10 @@ export function ChatArea({ threadId, isInitialLoadPending = false, isTyping, bub
         <WelcomeBanner onSuggestionClick={onSuggestionClick} />
       ) : (
         <>
-          <DateDivider date={messages?.[0]?.timestamp} />
+          <DateDivider date={messages[0]?.timestamp} />
           <div className="flex flex-col gap-1 pb-2">
             <AnimatePresence mode="popLayout">
-              {messages?.map((msg) => (
+              {messages.map((msg) => (
                 <ErrorBoundary key={msg.id} name="ChatBubble" fallback={
                   <div className="px-4 py-2 text-xs text-zinc-500 italic">Failed to render message</div>
                 }>

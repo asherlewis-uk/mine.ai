@@ -40,6 +40,27 @@ const ColorBends = dynamic(() => import("@/components/shaders/ColorBends"), {
   ssr: false,
 });
 
+function createSessionMessage(
+  threadId: string,
+  role: Message["role"],
+  content: string,
+  options?: {
+    id?: string;
+    thinking?: string;
+  },
+): Message {
+  return {
+    id:
+      options?.id ??
+      `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    threadId,
+    role,
+    content,
+    ...(options?.thinking ? { thinking: options.thinking } : {}),
+    timestamp: new Date(),
+  };
+}
+
 export default function MineAIChat() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -68,6 +89,76 @@ export default function MineAIChat() {
   const errorToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const [sessionMessagesByThreadId, setSessionMessagesByThreadId] = useState<
+    Record<string, Message[]>
+  >({});
+  const sessionMessagesByThreadIdRef = useRef<Record<string, Message[]>>({});
+
+  useEffect(() => {
+    sessionMessagesByThreadIdRef.current = sessionMessagesByThreadId;
+  }, [sessionMessagesByThreadId]);
+
+  const getSessionMessages = useCallback((threadId: string) => {
+    return sessionMessagesByThreadIdRef.current[threadId] ?? [];
+  }, []);
+
+  const appendSessionMessage = useCallback((threadId: string, message: Message) => {
+    setSessionMessagesByThreadId((prev) => ({
+      ...prev,
+      [threadId]: [...(prev[threadId] ?? []), message],
+    }));
+  }, []);
+
+  const updateSessionMessageState = useCallback(
+    (
+      threadId: string,
+      messageId: string,
+      updates: Partial<Pick<Message, "content" | "thinking">>,
+    ) => {
+      setSessionMessagesByThreadId((prev) => {
+        const threadMessages = prev[threadId];
+        if (!threadMessages?.length) return prev;
+
+        return {
+          ...prev,
+          [threadId]: threadMessages.map((message) =>
+            message.id === messageId ? { ...message, ...updates } : message,
+          ),
+        };
+      });
+    },
+    [],
+  );
+
+  const removeSessionMessage = useCallback((threadId: string, messageId: string) => {
+    setSessionMessagesByThreadId((prev) => {
+      const threadMessages = prev[threadId];
+      if (!threadMessages?.length) return prev;
+
+      return {
+        ...prev,
+        [threadId]: threadMessages.filter((message) => message.id !== messageId),
+      };
+    });
+  }, []);
+
+  const moveSessionMessages = useCallback(
+    (fromThreadId: string, toThreadId: string) => {
+      setSessionMessagesByThreadId((prev) => {
+        const existing = prev[fromThreadId];
+        if (!existing?.length) return prev;
+
+        const next = { ...prev };
+        delete next[fromThreadId];
+        next[toThreadId] = existing.map((message) => ({
+          ...message,
+          threadId: toThreadId,
+        }));
+        return next;
+      });
+    },
+    [],
+  );
 
   /** Show a transient glassmorphism error toast */
   const showErrorToast = useCallback((msg: string) => {
@@ -227,6 +318,10 @@ export default function MineAIChat() {
       const isIncognito = settings.incognito_active;
 
       let threadId = activeThreadId;
+      const previousThreadId = threadId;
+      let sessionHistory = previousThreadId
+        ? getSessionMessages(previousThreadId)
+        : [];
       let currentThread = threadId ? await db.threads.get(threadId) : undefined;
 
       if (!threadId) {
@@ -257,6 +352,9 @@ export default function MineAIChat() {
         threadId = newThread.id;
         setActiveThreadId(threadId);
         currentThread = newThread;
+        if (previousThreadId && previousThreadId !== threadId) {
+          moveSessionMessages(previousThreadId, threadId);
+        }
       }
 
       // Fetch character directly from DB if thread is associated with one
@@ -295,15 +393,27 @@ export default function MineAIChat() {
         }
       }
 
+      const userSessionMessage = createSessionMessage(
+        threadId,
+        "user",
+        displayMessage,
+      );
+
       // Add user message to DB (display version with filename) — skip in incognito
       if (!isIncognito) {
         await addMessage(threadId, "user", displayMessage);
+      } else {
+        appendSessionMessage(threadId, userSessionMessage);
+        sessionHistory = [...sessionHistory, userSessionMessage];
       }
       // Don't clear input yet — only clear after successful stream
       setIsTyping(true);
 
       // Prepare AI message — in incognito, use in-memory only
       const aiMessageId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const aiSessionMessage = createSessionMessage(threadId, "ai", "", {
+        id: aiMessageId,
+      });
       if (!isIncognito) {
         await db.messages.add({
           id: aiMessageId,
@@ -312,6 +422,8 @@ export default function MineAIChat() {
           content: "",
           timestamp: new Date(),
         });
+      } else {
+        appendSessionMessage(threadId, aiSessionMessage);
       }
 
       // ═══ SYSTEM PROMPT CONSTRUCTION ═══
@@ -347,10 +459,13 @@ export default function MineAIChat() {
       // to prevent double-injection. See api.ts "IDENTITY INJECTION (Service-Level)".
 
       // Prepare message history
-      const history = await db.messages
+      const persistedHistory = await db.messages
         .where("threadId")
         .equals(threadId)
         .sortBy("timestamp");
+      const history = [...persistedHistory, ...sessionHistory].sort(
+        (a, b) => a.timestamp.getTime() - b.timestamp.getTime(),
+      );
 
       const rawMessages: ChatMessage[] = history
         .filter((m) => m.role !== "ai" || m.content) // Exclude empty AI messages
@@ -359,16 +474,14 @@ export default function MineAIChat() {
           content: m.content,
         }));
 
-      // In incognito, the current user prompt is not persisted to Dexie,
-      // so append it in-memory for this one request only.
-      if (isIncognito) {
-        rawMessages.push({ role: "user", content: userMessage });
-      } else if (
+      if (
         rawMessages.length > 0 &&
         rawMessages[rawMessages.length - 1].role === "user"
       ) {
         // Replace the last persisted user message with the RAG-enhanced version.
         rawMessages[rawMessages.length - 1].content = userMessage;
+      } else if (isIncognito) {
+        rawMessages.push({ role: "user", content: userMessage });
       }
 
       /* REFACTOR: Token-aware sliding window truncation.
@@ -473,6 +586,11 @@ export default function MineAIChat() {
                 content: parsed.content,
                 ...(mergedThinking ? { thinking: mergedThinking } : {}),
               });
+            } else {
+              updateSessionMessageState(threadId, aiMessageId, {
+                content: parsed.content,
+                ...(mergedThinking ? { thinking: mergedThinking } : {}),
+              });
             }
           },
           onThinking: (thinking) => {
@@ -480,6 +598,10 @@ export default function MineAIChat() {
               accumulatedThinking += thinking;
               if (!isIncognito) {
                 throttledUpdateMessage({ thinking: accumulatedThinking });
+              } else {
+                updateSessionMessageState(threadId, aiMessageId, {
+                  thinking: accumulatedThinking,
+                });
               }
             }
           },
@@ -500,6 +622,13 @@ export default function MineAIChat() {
               (error instanceof NetworkError && error.kind === "stream_abort");
             if (isManualAbort) {
               flushPendingUpdate(); // Save whatever we accumulated
+              if (
+                isIncognito &&
+                !accumulatedRawContent.trim() &&
+                !accumulatedThinking.trim()
+              ) {
+                removeSessionMessage(threadId, aiMessageId);
+              }
               setIsTyping(false);
               setInputValue(""); // user intentionally stopped
               abortControllerRef.current = null;
@@ -517,6 +646,8 @@ export default function MineAIChat() {
             // Remove the empty AI placeholder message (if persisted)
             if (!isIncognito) {
               db.messages.delete(aiMessageId).catch(() => {});
+            } else {
+              removeSessionMessage(threadId, aiMessageId);
             }
             showErrorToast(
               `${userMsg} — check your API settings and connection.`,
@@ -531,13 +662,26 @@ export default function MineAIChat() {
         // Remove the empty AI placeholder message (if persisted)
         if (!isIncognito) {
           db.messages.delete(aiMessageId).catch(() => {});
+        } else {
+          removeSessionMessage(threadId, aiMessageId);
         }
         showErrorToast("Unexpected error occurred. Please try again.");
         setIsTyping(false);
         // Input is NOT cleared — user can retry
       }
     },
-    [isTyping, activeThreadId, activeCharacterId, activeCharacter, showErrorToast],
+    [
+      isTyping,
+      activeThreadId,
+      activeCharacterId,
+      activeCharacter,
+      showErrorToast,
+      getSessionMessages,
+      appendSessionMessage,
+      updateSessionMessageState,
+      removeSessionMessage,
+      moveSessionMessages,
+    ],
   ); // isTyping guards re-entry; active thread/character state is needed for thread materialization; showErrorToast is stable ([] deps). DB settings and persisted thread reads stay JIT-fetched.
 
   const handleClearChat = useCallback(async () => {
@@ -549,6 +693,30 @@ export default function MineAIChat() {
     setClearChatConfirm(false);
     if (!activeThreadId) return;
 
+    const settings = await getAllSettings();
+    if (settings.incognito_active) {
+      const nextThread = activeCharacterId
+        ? await createCharacterThread(
+            activeCharacterId,
+            activeCharacter
+              ? `Chat with ${activeCharacter.name}`
+              : "New Chat",
+            { persist: false },
+          )
+        : await createThread("New Chat", { persist: false });
+
+      appendSessionMessage(
+        nextThread.id,
+        createSessionMessage(
+          nextThread.id,
+          "ai",
+          "Conversation cleared. How can I help you?",
+        ),
+      );
+      setActiveThreadId(nextThread.id);
+      return;
+    }
+
     await db.messages.where("threadId").equals(activeThreadId).delete();
 
     // Add welcome message
@@ -557,7 +725,7 @@ export default function MineAIChat() {
       "ai",
       "Conversation cleared. How can I help you?",
     );
-  }, [activeThreadId]);
+  }, [activeThreadId, activeCharacterId, activeCharacter, appendSessionMessage]);
 
   const handleStop = useCallback(() => {
     if (abortControllerRef.current) {
@@ -705,6 +873,11 @@ export default function MineAIChat() {
         <ChatArea
           key={activeThreadId ?? "no-thread"}
           threadId={activeThreadId}
+          sessionMessages={
+            activeThreadId
+              ? sessionMessagesByThreadId[activeThreadId] ?? []
+              : []
+          }
           isInitialLoadPending={isRestoringInitialThread}
           isTyping={isTyping}
           bubbleStyle={bubbleStyle as any}
