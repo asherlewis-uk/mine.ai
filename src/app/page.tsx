@@ -623,11 +623,14 @@ export default function MineAIChat() {
             if (isManualAbort) {
               flushPendingUpdate(); // Save whatever we accumulated
               if (
-                isIncognito &&
                 !accumulatedRawContent.trim() &&
                 !accumulatedThinking.trim()
               ) {
-                removeSessionMessage(threadId, aiMessageId);
+                if (!isIncognito) {
+                  db.messages.delete(aiMessageId).catch(() => {});
+                } else {
+                  removeSessionMessage(threadId, aiMessageId);
+                }
               }
               setIsTyping(false);
               setInputValue(""); // user intentionally stopped
