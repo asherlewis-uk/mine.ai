@@ -239,6 +239,26 @@ export async function updateMessage(
   await db.messages.update(messageId, updates);
 }
 
+export async function deleteEmptyAssistantMessages(): Promise<number> {
+  const emptyAssistantMessages = await db.messages
+    .filter(
+      (message) => message.role === "ai" && !message.content.trim(),
+    )
+    .toArray();
+
+  if (emptyAssistantMessages.length === 0) {
+    return 0;
+  }
+
+  await db.transaction("rw", db.messages, async () => {
+    for (const message of emptyAssistantMessages) {
+      await db.messages.delete(message.id);
+    }
+  });
+
+  return emptyAssistantMessages.length;
+}
+
 export async function getThreadMessages(threadId: string): Promise<Message[]> {
   return db.messages
     .where("threadId")

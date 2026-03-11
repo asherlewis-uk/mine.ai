@@ -12,6 +12,7 @@ import {
   getAllSettings,
   getSetting,
   getFlexibleSetting,
+  deleteEmptyAssistantMessages,
   getCharacter,
   createCharacterThread,
   type Message,
@@ -191,6 +192,7 @@ export default function MineAIChat() {
     const restoreInitialThread = async () => {
       try {
         await initializeDatabase();
+        await deleteEmptyAssistantMessages();
 
         // Set initial active thread to the most recent one
         const threads = await db.threads.orderBy("updatedAt").reverse().toArray();
