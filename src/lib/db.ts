@@ -147,13 +147,36 @@ export async function getAllSettings(): Promise<typeof DEFAULT_SETTINGS> {
 }
 
 // ─── Thread Helper Functions ─────────────────────────────────────
-export async function createThread(title: string = "New Chat"): Promise<Thread> {
-  const thread: Thread = {
+type CreateThreadOptions = {
+  persist?: boolean;
+};
+
+function buildThread(title: string, characterId?: number): Thread {
+  return {
     id: `thread_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
     title,
     updatedAt: new Date(),
+    ...(characterId !== undefined ? { characterId } : {}),
   };
-  await db.threads.add(thread);
+}
+
+async function shouldPersistThread(options?: CreateThreadOptions): Promise<boolean> {
+  if (typeof options?.persist === "boolean") {
+    return options.persist;
+  }
+
+  const isIncognito = await getSetting("incognito_active");
+  return !isIncognito;
+}
+
+export async function createThread(
+  title: string = "New Chat",
+  options?: CreateThreadOptions
+): Promise<Thread> {
+  const thread = buildThread(title);
+  if (await shouldPersistThread(options)) {
+    await db.threads.add(thread);
+  }
   return thread;
 }
 
@@ -214,6 +237,26 @@ export async function updateMessage(
   updates: Partial<Pick<Message, "content" | "thinking">>
 ): Promise<void> {
   await db.messages.update(messageId, updates);
+}
+
+export async function deleteEmptyAssistantMessages(): Promise<number> {
+  const emptyAssistantMessages = await db.messages
+    .filter(
+      (message) => message.role === "ai" && !message.content.trim(),
+    )
+    .toArray();
+
+  if (emptyAssistantMessages.length === 0) {
+    return 0;
+  }
+
+  await db.transaction("rw", db.messages, async () => {
+    for (const message of emptyAssistantMessages) {
+      await db.messages.delete(message.id);
+    }
+  });
+
+  return emptyAssistantMessages.length;
 }
 
 export async function getThreadMessages(threadId: string): Promise<Message[]> {
@@ -283,15 +326,13 @@ export async function getCharacterThreads(characterId: number): Promise<Thread[]
 // Helper to create a thread for a specific character
 export async function createCharacterThread(
   characterId: number,
-  title: string = "New Chat"
+  title: string = "New Chat",
+  options?: CreateThreadOptions
 ): Promise<Thread> {
-  const thread: Thread = {
-    id: `thread_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-    title,
-    updatedAt: new Date(),
-    characterId,
-  };
-  await db.threads.add(thread);
+  const thread = buildThread(title, characterId);
+  if (await shouldPersistThread(options)) {
+    await db.threads.add(thread);
+  }
   return thread;
 }
 
@@ -313,7 +354,9 @@ export async function initializeDatabase(): Promise<void> {
   
   if (threadCount === 0) {
     // Create a welcome thread
-    const welcomeThread = await createThread("Welcome to mine.ai");
+    const welcomeThread = await createThread("Welcome to mine.ai", {
+      persist: true,
+    });
     await addMessage(
       welcomeThread.id,
       "ai",

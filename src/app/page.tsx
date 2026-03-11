@@ -12,6 +12,7 @@ import {
   getAllSettings,
   getSetting,
   getFlexibleSetting,
+  deleteEmptyAssistantMessages,
   getCharacter,
   createCharacterThread,
   type Message,
@@ -40,11 +41,34 @@ const ColorBends = dynamic(() => import("@/components/shaders/ColorBends"), {
   ssr: false,
 });
 
+function createSessionMessage(
+  threadId: string,
+  role: Message["role"],
+  content: string,
+  options?: {
+    id?: string;
+    thinking?: string;
+  },
+): Message {
+  return {
+    id:
+      options?.id ??
+      `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    threadId,
+    role,
+    content,
+    ...(options?.thinking ? { thinking: options.thinking } : {}),
+    timestamp: new Date(),
+  };
+}
+
 export default function MineAIChat() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [isRestoringInitialThread, setIsRestoringInitialThread] =
+    useState(true);
   const [settingsDefaultScreen, setSettingsDefaultScreen] = useState<
-    string | undefined
+    "identity" | undefined
   >(undefined);
   const [characterProfileOpen, setCharacterProfileOpen] = useState(false);
   const [inputValue, setInputValue] = useState("");
@@ -66,6 +90,76 @@ export default function MineAIChat() {
   const errorToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const [sessionMessagesByThreadId, setSessionMessagesByThreadId] = useState<
+    Record<string, Message[]>
+  >({});
+  const sessionMessagesByThreadIdRef = useRef<Record<string, Message[]>>({});
+
+  useEffect(() => {
+    sessionMessagesByThreadIdRef.current = sessionMessagesByThreadId;
+  }, [sessionMessagesByThreadId]);
+
+  const getSessionMessages = useCallback((threadId: string) => {
+    return sessionMessagesByThreadIdRef.current[threadId] ?? [];
+  }, []);
+
+  const appendSessionMessage = useCallback((threadId: string, message: Message) => {
+    setSessionMessagesByThreadId((prev) => ({
+      ...prev,
+      [threadId]: [...(prev[threadId] ?? []), message],
+    }));
+  }, []);
+
+  const updateSessionMessageState = useCallback(
+    (
+      threadId: string,
+      messageId: string,
+      updates: Partial<Pick<Message, "content" | "thinking">>,
+    ) => {
+      setSessionMessagesByThreadId((prev) => {
+        const threadMessages = prev[threadId];
+        if (!threadMessages?.length) return prev;
+
+        return {
+          ...prev,
+          [threadId]: threadMessages.map((message) =>
+            message.id === messageId ? { ...message, ...updates } : message,
+          ),
+        };
+      });
+    },
+    [],
+  );
+
+  const removeSessionMessage = useCallback((threadId: string, messageId: string) => {
+    setSessionMessagesByThreadId((prev) => {
+      const threadMessages = prev[threadId];
+      if (!threadMessages?.length) return prev;
+
+      return {
+        ...prev,
+        [threadId]: threadMessages.filter((message) => message.id !== messageId),
+      };
+    });
+  }, []);
+
+  const moveSessionMessages = useCallback(
+    (fromThreadId: string, toThreadId: string) => {
+      setSessionMessagesByThreadId((prev) => {
+        const existing = prev[fromThreadId];
+        if (!existing?.length) return prev;
+
+        const next = { ...prev };
+        delete next[fromThreadId];
+        next[toThreadId] = existing.map((message) => ({
+          ...message,
+          threadId: toThreadId,
+        }));
+        return next;
+      });
+    },
+    [],
+  );
 
   /** Show a transient glassmorphism error toast */
   const showErrorToast = useCallback((msg: string) => {
@@ -93,39 +187,33 @@ export default function MineAIChat() {
 
   // Initialize database on mount
   useEffect(() => {
-    initializeDatabase().then(async () => {
-      // Set initial active thread to the most recent one
-      const threads = await db.threads.orderBy("updatedAt").reverse().toArray();
-      if (threads.length > 0) {
-        setActiveThreadId(threads[0].id);
-      }
-    });
-  }, []);
+    let cancelled = false;
 
-  // Auto-connect effect: Test API connection on mount
-  useEffect(() => {
-    const testConnection = async () => {
-      const settings = await getAllSettings();
+    const restoreInitialThread = async () => {
+      try {
+        await initializeDatabase();
+        await deleteEmptyAssistantMessages();
 
-      // Only test if API URL and model are configured
-      if (settings.apiUrl && settings.modelName) {
-        const result = await testAPIConnection(
-          settings.apiUrl,
-          settings.modelName,
-        );
-
-        if (result.success) {
-          setModelStatus("online");
-        } else {
-          setModelStatus("offline");
+        // Set initial active thread to the most recent one
+        const threads = await db.threads.orderBy("updatedAt").reverse().toArray();
+        if (!cancelled) {
+          setActiveThreadId(threads[0]?.id ?? null);
         }
-      } else {
-        setModelStatus("unknown");
+      } catch (error) {
+        console.error("Failed to restore initial thread:", error);
+      } finally {
+        if (!cancelled) {
+          setIsRestoringInitialThread(false);
+        }
       }
     };
 
-    testConnection();
-  }, []); // Run once on mount
+    restoreInitialThread();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   /* REFACTOR: Zombie State handler — abort stale streams when app resumes
      after being backgrounded by iOS/Android. Prevents stuck isTyping state
@@ -190,6 +278,36 @@ export default function MineAIChat() {
   // Get bubble style from settings
   const bubbleStyle =
     useLiveQuery(() => getSetting("bubble_style")) || "default";
+  const apiUrlSetting = useLiveQuery(() => getSetting("apiUrl"));
+  const modelNameSetting = useLiveQuery(() => getSetting("modelName"));
+
+  // Rebind connection status from persisted settings after reload.
+  useEffect(() => {
+    let cancelled = false;
+
+    const testConnection = async () => {
+      if (!apiUrlSetting || !modelNameSetting) {
+        if (!cancelled) setModelStatus("unknown");
+        return;
+      }
+
+      try {
+        const result = await testAPIConnection(apiUrlSetting, modelNameSetting);
+        if (!cancelled) {
+          setModelStatus(result.success ? "online" : "offline");
+        }
+      } catch (error) {
+        console.error("Failed to test API connection:", error);
+        if (!cancelled) setModelStatus("offline");
+      }
+    };
+
+    testConnection();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [apiUrlSetting, modelNameSetting]);
 
   const handleSend = useCallback(
     async (message: string, file?: File) => {
@@ -197,23 +315,59 @@ export default function MineAIChat() {
       if (!trimmed && !file) return;
       if (isTyping) return;
 
-      // Create new thread if none exists
-      let threadId = activeThreadId;
-      if (!threadId) {
-        const newThread = await createThread();
-        threadId = newThread.id;
-        setActiveThreadId(threadId);
-      }
-
-      // ═══ JUST-IN-TIME FETCHING (PREVENT STALE STATE) ═══
       // Force-fetch fresh settings and thread state immediately before sending
       const settings = await getAllSettings();
       const isIncognito = settings.incognito_active;
-      const currentThread = await db.threads.get(threadId);
+
+      let threadId = activeThreadId;
+      const previousThreadId = threadId;
+      let sessionHistory = previousThreadId
+        ? getSessionMessages(previousThreadId)
+        : [];
+      let currentThread = threadId ? await db.threads.get(threadId) : undefined;
+
+      if (!threadId) {
+        const newThread = activeCharacterId
+          ? await createCharacterThread(
+              activeCharacterId,
+              activeCharacter
+                ? `Chat with ${activeCharacter.name}`
+                : "New Chat",
+              { persist: !isIncognito },
+            )
+          : await createThread("New Chat", { persist: !isIncognito });
+        threadId = newThread.id;
+        setActiveThreadId(threadId);
+        currentThread = isIncognito ? undefined : newThread;
+      } else if (!isIncognito && !currentThread) {
+        // Materialize a real thread when leaving incognito so new messages
+        // resume normal persistence instead of writing orphaned records.
+        const newThread = activeCharacterId
+          ? await createCharacterThread(
+              activeCharacterId,
+              activeCharacter
+                ? `Chat with ${activeCharacter.name}`
+                : "New Chat",
+              { persist: true },
+            )
+          : await createThread("New Chat", { persist: true });
+        threadId = newThread.id;
+        setActiveThreadId(threadId);
+        currentThread = newThread;
+        if (previousThreadId && previousThreadId !== threadId) {
+          moveSessionMessages(previousThreadId, threadId);
+        }
+      }
 
       // Fetch character directly from DB if thread is associated with one
-      let currentCharacter: Character | null = null;
-      if (currentThread?.characterId) {
+      let currentCharacter: Character | null =
+        activeCharacterId && activeCharacter?.id === activeCharacterId
+          ? activeCharacter
+          : null;
+      if (
+        currentThread?.characterId &&
+        currentCharacter?.id !== currentThread.characterId
+      ) {
         const char = await getCharacter(currentThread.characterId);
         if (char) {
           currentCharacter = char;
@@ -241,15 +395,27 @@ export default function MineAIChat() {
         }
       }
 
+      const userSessionMessage = createSessionMessage(
+        threadId,
+        "user",
+        displayMessage,
+      );
+
       // Add user message to DB (display version with filename) — skip in incognito
       if (!isIncognito) {
         await addMessage(threadId, "user", displayMessage);
+      } else {
+        appendSessionMessage(threadId, userSessionMessage);
+        sessionHistory = [...sessionHistory, userSessionMessage];
       }
       // Don't clear input yet — only clear after successful stream
       setIsTyping(true);
 
       // Prepare AI message — in incognito, use in-memory only
       const aiMessageId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const aiSessionMessage = createSessionMessage(threadId, "ai", "", {
+        id: aiMessageId,
+      });
       if (!isIncognito) {
         await db.messages.add({
           id: aiMessageId,
@@ -258,6 +424,8 @@ export default function MineAIChat() {
           content: "",
           timestamp: new Date(),
         });
+      } else {
+        appendSessionMessage(threadId, aiSessionMessage);
       }
 
       // ═══ SYSTEM PROMPT CONSTRUCTION ═══
@@ -293,10 +461,13 @@ export default function MineAIChat() {
       // to prevent double-injection. See api.ts "IDENTITY INJECTION (Service-Level)".
 
       // Prepare message history
-      const history = await db.messages
+      const persistedHistory = await db.messages
         .where("threadId")
         .equals(threadId)
         .sortBy("timestamp");
+      const history = [...persistedHistory, ...sessionHistory].sort(
+        (a, b) => a.timestamp.getTime() - b.timestamp.getTime(),
+      );
 
       const rawMessages: ChatMessage[] = history
         .filter((m) => m.role !== "ai" || m.content) // Exclude empty AI messages
@@ -305,12 +476,14 @@ export default function MineAIChat() {
           content: m.content,
         }));
 
-      // Replace the last user message with the RAG-enhanced version
       if (
         rawMessages.length > 0 &&
         rawMessages[rawMessages.length - 1].role === "user"
       ) {
+        // Replace the last persisted user message with the RAG-enhanced version.
         rawMessages[rawMessages.length - 1].content = userMessage;
+      } else if (isIncognito) {
+        rawMessages.push({ role: "user", content: userMessage });
       }
 
       /* REFACTOR: Token-aware sliding window truncation.
@@ -415,6 +588,11 @@ export default function MineAIChat() {
                 content: parsed.content,
                 ...(mergedThinking ? { thinking: mergedThinking } : {}),
               });
+            } else {
+              updateSessionMessageState(threadId, aiMessageId, {
+                content: parsed.content,
+                ...(mergedThinking ? { thinking: mergedThinking } : {}),
+              });
             }
           },
           onThinking: (thinking) => {
@@ -422,6 +600,10 @@ export default function MineAIChat() {
               accumulatedThinking += thinking;
               if (!isIncognito) {
                 throttledUpdateMessage({ thinking: accumulatedThinking });
+              } else {
+                updateSessionMessageState(threadId, aiMessageId, {
+                  thinking: accumulatedThinking,
+                });
               }
             }
           },
@@ -437,8 +619,21 @@ export default function MineAIChat() {
             // Cancel any pending throttled write
             if (flushTimer) clearTimeout(flushTimer);
             // Don't show error if user manually aborted
-            if (error.name === "AbortError") {
+            const isManualAbort =
+              error.name === "AbortError" ||
+              (error instanceof NetworkError && error.kind === "stream_abort");
+            if (isManualAbort) {
               flushPendingUpdate(); // Save whatever we accumulated
+              if (
+                !accumulatedRawContent.trim() &&
+                !accumulatedThinking.trim()
+              ) {
+                if (!isIncognito) {
+                  db.messages.delete(aiMessageId).catch(() => {});
+                } else {
+                  removeSessionMessage(threadId, aiMessageId);
+                }
+              }
               setIsTyping(false);
               setInputValue(""); // user intentionally stopped
               abortControllerRef.current = null;
@@ -456,6 +651,8 @@ export default function MineAIChat() {
             // Remove the empty AI placeholder message (if persisted)
             if (!isIncognito) {
               db.messages.delete(aiMessageId).catch(() => {});
+            } else {
+              removeSessionMessage(threadId, aiMessageId);
             }
             showErrorToast(
               `${userMsg} — check your API settings and connection.`,
@@ -470,14 +667,27 @@ export default function MineAIChat() {
         // Remove the empty AI placeholder message (if persisted)
         if (!isIncognito) {
           db.messages.delete(aiMessageId).catch(() => {});
+        } else {
+          removeSessionMessage(threadId, aiMessageId);
         }
         showErrorToast("Unexpected error occurred. Please try again.");
         setIsTyping(false);
         // Input is NOT cleared — user can retry
       }
     },
-    [isTyping, activeThreadId, showErrorToast],
-  ); // isTyping guards re-entry; activeThreadId for thread context; showErrorToast is stable ([] deps). DB reads are JIT-fetched (not closured).
+    [
+      isTyping,
+      activeThreadId,
+      activeCharacterId,
+      activeCharacter,
+      showErrorToast,
+      getSessionMessages,
+      appendSessionMessage,
+      updateSessionMessageState,
+      removeSessionMessage,
+      moveSessionMessages,
+    ],
+  ); // isTyping guards re-entry; active thread/character state is needed for thread materialization; showErrorToast is stable ([] deps). DB settings and persisted thread reads stay JIT-fetched.
 
   const handleClearChat = useCallback(async () => {
     if (!activeThreadId) return;
@@ -488,6 +698,30 @@ export default function MineAIChat() {
     setClearChatConfirm(false);
     if (!activeThreadId) return;
 
+    const settings = await getAllSettings();
+    if (settings.incognito_active) {
+      const nextThread = activeCharacterId
+        ? await createCharacterThread(
+            activeCharacterId,
+            activeCharacter
+              ? `Chat with ${activeCharacter.name}`
+              : "New Chat",
+            { persist: false },
+          )
+        : await createThread("New Chat", { persist: false });
+
+      appendSessionMessage(
+        nextThread.id,
+        createSessionMessage(
+          nextThread.id,
+          "ai",
+          "Conversation cleared. How can I help you?",
+        ),
+      );
+      setActiveThreadId(nextThread.id);
+      return;
+    }
+
     await db.messages.where("threadId").equals(activeThreadId).delete();
 
     // Add welcome message
@@ -496,7 +730,7 @@ export default function MineAIChat() {
       "ai",
       "Conversation cleared. How can I help you?",
     );
-  }, [activeThreadId]);
+  }, [activeThreadId, activeCharacterId, activeCharacter, appendSessionMessage]);
 
   const handleStop = useCallback(() => {
     if (abortControllerRef.current) {
@@ -518,6 +752,9 @@ export default function MineAIChat() {
     setActiveCharacterId(character.id || null);
     setActiveCharacter(character);
 
+    const settings = await getAllSettings();
+    const isIncognito = settings.incognito_active;
+
     // Create a new thread for this character or get the most recent one
     const existingThreads = await db.threads
       .where("characterId")
@@ -533,11 +770,12 @@ export default function MineAIChat() {
       const newThread = await createCharacterThread(
         character.id || 0,
         `Chat with ${character.name}`,
+        { persist: !isIncognito },
       );
       threadId = newThread.id;
 
       // Add initial greeting if available
-      if (character.greetings && character.greetings.length > 0) {
+      if (!isIncognito && character.greetings && character.greetings.length > 0) {
         const greeting =
           character.greetings[
             Math.floor(Math.random() * character.greetings.length)
@@ -548,6 +786,11 @@ export default function MineAIChat() {
 
     setActiveThreadId(threadId);
     setSidebarOpen(false);
+  }, []);
+
+  const openSettings = useCallback((defaultScreen?: "identity") => {
+    setSettingsDefaultScreen(defaultScreen);
+    setSettingsOpen(true);
   }, []);
 
   return (
@@ -564,16 +807,10 @@ export default function MineAIChat() {
         onClose={() => setSidebarOpen(false)}
         activeThreadId={activeThreadId}
         onSelectThread={setActiveThreadId}
-        onOpenSettings={() => {
-          setSettingsDefaultScreen(undefined);
-          setSettingsOpen(true);
-        }}
+        onOpenSettings={() => openSettings()}
         onSelectCharacter={handleSelectCharacter}
         activeCharacterId={activeCharacterId}
-        onOpenIdentity={() => {
-          setSettingsDefaultScreen("identity");
-          setSettingsOpen(true);
-        }}
+        onOpenIdentity={() => openSettings("identity")}
       />
 
       {/* Settings Bottom Sheet */}
@@ -583,7 +820,7 @@ export default function MineAIChat() {
           setSettingsOpen(false);
           setSettingsDefaultScreen(undefined);
         }}
-        defaultScreen={settingsDefaultScreen as any}
+        defaultScreen={settingsDefaultScreen}
       />
 
       {/* Character Profile Sheet */}
@@ -630,7 +867,7 @@ export default function MineAIChat() {
         {/* Header with Safe Area */}
         <ChatHeader
           onMenuClick={() => setSidebarOpen(true)}
-          onSettingsClick={() => setSettingsOpen(true)}
+          onSettingsClick={() => openSettings()}
           onClearChat={handleClearChat}
           modelStatus={modelStatus}
           activeCharacter={activeCharacter}
@@ -639,7 +876,14 @@ export default function MineAIChat() {
 
         {/* Scrollable Messages */}
         <ChatArea
+          key={activeThreadId ?? "no-thread"}
           threadId={activeThreadId}
+          sessionMessages={
+            activeThreadId
+              ? sessionMessagesByThreadId[activeThreadId] ?? []
+              : []
+          }
+          isInitialLoadPending={isRestoringInitialThread}
           isTyping={isTyping}
           bubbleStyle={bubbleStyle as any}
           characterAvatar={activeCharacter?.avatar}
