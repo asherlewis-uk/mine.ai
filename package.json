@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
+    "start": "serve out",
     "lint": "eslint",
     "test": "vitest run"
   },
@@ -34,6 +34,7 @@
     "react-markdown": "^10.1.0",
     "rehype-highlight": "^7.0.2",
     "remark-gfm": "^4.0.1",
+    "serve": "^14.2.6",
     "tailwind-merge": "^3.4.0",
     "three": "^0.183.2"
   },
